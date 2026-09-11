@@ -1,9 +1,8 @@
 import { supabase } from './supabase.js';
 
 export function renderLayout() {
+    // Configuración del Sidebar (si aplica dinámicamente)
     const sidebar = document.getElementById('sidebar-container');
-    const navbar = document.getElementById('navbar-container');
-
     if (sidebar) {
         sidebar.innerHTML = `
             <div class="sidebar-brand">
@@ -24,31 +23,53 @@ export function renderLayout() {
         `;
     }
 
-    if (navbar) {
-        navbar.innerHTML = `
-            <div class="navbar-left">
-                <button id="toggle-sidebar" class="btn-icon">☰</button>
-            </div>
-            <div class="navbar-right">
-                <span id="user-email" class="user-name">Cargando...</span>
-                <button id="btn-logout" class="btn btn-secondary btn-sm">Cerrar Sesión</button>
-            </div>
-        `;
+    // Lógica del nombre de usuario en la barra superior
+    const userDisplayName = document.getElementById('user-display-name');
+    const sessionData = localStorage.getItem('user_session');
 
-        // Evento de Logout
-        document.getElementById('btn-logout')?.addEventListener('click', async () => {
-            await supabase.auth.signOut();
-            window.location.href = 'index.html';
+    if (sessionData && userDisplayName) {
+        try {
+            const user = JSON.parse(sessionData);
+            userDisplayName.textContent = user.nombre || 'Moises Chunga';
+        } catch (e) {
+            userDisplayName.textContent = 'Moises Chunga';
+        }
+    } else {
+        supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user && userDisplayName) {
+                userDisplayName.textContent = user.user_metadata?.full_name || user.email || 'Moises Chunga';
+            }
         });
     }
 
-    // Cargar email del usuario activo
-    supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user) {
-            const userEmailEl = document.getElementById('user-email');
-            if (userEmailEl) userEmailEl.textContent = user.email;
-        }
-    });
+    // Toggle para desplegar / ocultar el menú del usuario
+    const dropdownToggle = document.getElementById('user-dropdown-toggle');
+    const userMenu = document.getElementById('user-menu');
+
+    if (dropdownToggle && userMenu) {
+        dropdownToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userMenu.classList.toggle('active');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!userMenu.contains(e.target) && !dropdownToggle.contains(e.target)) {
+                userMenu.classList.remove('active');
+            }
+        });
+    }
+
+    // Manejador centralizado para Cerrar Sesión
+    const handleLogout = async (e) => {
+        if (e) e.preventDefault();
+        localStorage.removeItem('user_session');
+        await supabase.auth.signOut();
+        window.location.href = 'index.html';
+    };
+
+    // Vincular evento a los botones de logout (sidebar y dropdown)
+    document.getElementById('btn-logout')?.addEventListener('click', handleLogout);
+    document.getElementById('btn-dropdown-logout')?.addEventListener('click', handleLogout);
 }
 
 document.addEventListener('DOMContentLoaded', renderLayout);

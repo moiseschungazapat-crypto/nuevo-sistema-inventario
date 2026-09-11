@@ -68,13 +68,28 @@
                     </button>
                     <span class="navbar-title">SISTEMA DE INVENTARIO</span>
                 </div>
-                <div class="navbar-right">
-                    <div class="user-dropdown">
-                        <i class="fa-solid fa-circle-user user-icon"></i>
-                        <span id="user-display-name" class="user-name">Cargando...</span>
-                        <i class="fa-solid fa-caret-down"></i>
-                    </div>
-                </div>
+                <<div class="navbar-right">
+    <div class="user-dropdown-container">
+        <div id="user-dropdown-toggle" class="user-dropdown">
+            <i class="fa-solid fa-circle-user user-icon"></i>
+            <span id="user-display-name" class="user-name">Moises Chunga</span>
+            <i class="fa-solid fa-caret-down"></i>
+        </div>
+        
+        <div id="user-menu" class="user-menu-dropdown">
+            <a href="#" class="user-menu-item">
+                <i class="fa-solid fa-user"></i> Mi Perfil
+            </a>
+            <a href="#" class="user-menu-item">
+                <i class="fa-solid fa-gear"></i> Configuración
+            </a>
+            <hr class="dropdown-divider">
+            <button id="btn-dropdown-logout" class="user-menu-item logout-item">
+                <i class="fa-solid fa-power-off"></i> Cerrar Sesión
+            </button>
+        </div>
+    </div>
+</div>
             </header>
 
             <!-- Área de Contenido -->
