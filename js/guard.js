@@ -1,14 +1,13 @@
-import { supabase } from './supabase.js';
+document.addEventListener('DOMContentLoaded', () => {
+    const session = localStorage.getItem('user_session');
 
-export async function checkAuth() {
-    const { data: { session } } = await supabase.auth.getSession();
-    
     if (!session) {
         window.location.href = 'index.html';
-        return null;
+    } else {
+        const user = JSON.parse(session);
+        const nameElement = document.getElementById('user-display-name');
+        if (nameElement) {
+            nameElement.textContent = user.nombre || 'Usuario';
+        }
     }
-    return session.user;
-}
-
-// Ejecutar automáticamente al cargar cualquier página protegida
-checkAuth();
+});
