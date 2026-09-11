@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnLogin = document.getElementById('btn-login');
     const statusBadge = document.getElementById('status-badge');
 
-    // 1. Mostrar / Ocultar Contraseña
     if (togglePassword && passwordInput) {
         togglePassword.addEventListener('click', () => {
             const isPassword = passwordInput.type === 'password';
@@ -18,19 +17,17 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 2. Iniciar Sesión
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const email = emailInput.value.trim();
-            const password = passwordInput.value;
+            const email = emailInput.value.trim().toLowerCase();
+            const password = passwordInput.value.trim();
 
             btnLogin.disabled = true;
             btnLogin.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verificando...`;
 
             try {
-                // Se usa maybeSingle() para evitar el error 406 de Supabase
                 const { data, error } = await supabase
                     .from('usuarios')
                     .select('*')
@@ -38,15 +35,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     .eq('password', password)
                     .maybeSingle();
 
-                if (error) {
-                    throw new Error('Error al conectar con la base de datos');
-                }
+                console.log('Respuesta Supabase:', { data, error });
 
-                if (!data) {
-                    throw new Error('Correo o contraseña incorrectos');
-                }
+                if (error) throw new Error('Error de conexión con la base de datos');
+                if (!data) throw new Error('Correo o contraseña incorrectos');
 
-                // Guardar la sesión localmente
                 localStorage.setItem('user_session', JSON.stringify(data));
 
                 statusBadge.className = 'status-badge success';
