@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnLogin = document.getElementById('btn-login');
     const statusBadge = document.getElementById('status-badge');
 
+    // 1. Mostrar / Ocultar Contraseña
     if (togglePassword && passwordInput) {
         togglePassword.addEventListener('click', () => {
             const isPassword = passwordInput.type === 'password';
@@ -17,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 2. Iniciar Sesión
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -28,21 +30,29 @@ document.addEventListener('DOMContentLoaded', () => {
             btnLogin.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verificando...`;
 
             try {
+                // Se usa maybeSingle() para evitar el error 406 de Supabase
                 const { data, error } = await supabase
                     .from('usuarios')
                     .select('*')
                     .eq('email', email)
                     .eq('password', password)
-                    .single();
+                    .maybeSingle();
 
-                if (error || !data) {
-                    throw new Error('Credenciales incorrectas');
+                if (error) {
+                    throw new Error('Error al conectar con la base de datos');
+                }
+
+                if (!data) {
+                    throw new Error('Correo o contraseña incorrectos');
                 }
 
                 // Guardar la sesión localmente
                 localStorage.setItem('user_session', JSON.stringify(data));
 
                 statusBadge.className = 'status-badge success';
+                statusBadge.style.backgroundColor = '#d1e7dd';
+                statusBadge.style.color = '#0f5132';
+                statusBadge.style.borderColor = '#badbcc';
                 statusBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Credenciales correctas. Redirigiendo...`;
 
                 setTimeout(() => {
