@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LA LIGURIA S.A. - Productos</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="assets/css/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-brand">
+                <img src="img/logo.png" alt="Logo" class="brand-logo">
+                <span class="brand-name">LA LIGURIA S.A.</span>
+            </div>
+
+            <nav class="sidebar-menu">
+                <a href="dashboard.html" class="menu-item">
+                    <i class="fa-solid fa-house"></i> <span>Dashboard</span>
+                </a>
+                <a href="productos.html" class="menu-item active">
+                    <i class="fa-solid fa-box"></i> <span>Productos</span>
+                </a>
+                <a href="categorias.html" class="menu-item">
+                    <i class="fa-solid fa-tag"></i> <span>Categorías</span>
+                </a>
+                <a href="proveedores.html" class="menu-item">
+                    <i class="fa-solid fa-truck"></i> <span>Proveedores</span>
+                </a>
+                <a href="sedes.html" class="menu-item">
+                    <i class="fa-solid fa-building"></i> <span>Sedes</span>
+                </a>
+                <a href="inventario.html" class="menu-item">
+                    <i class="fa-solid fa-boxes-stacked"></i> <span>Inventario</span>
+                </a>
+                <a href="movimientos.html" class="menu-item">
+                    <i class="fa-solid fa-arrow-right-arrow-left"></i> <span>Movimientos</span>
+                </a>
+                <a href="reportes.html" class="menu-item">
+                    <i class="fa-solid fa-chart-line"></i> <span>Reportes</span>
+                </a>
+                <a href="usuarios.html" class="menu-item">
+                    <i class="fa-solid fa-users"></i> <span>Usuarios</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button id="btn-logout" class="btn-logout">
+                    <i class="fa-solid fa-power-off"></i> <span>Cerrar Sesión</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Wrapper -->
+        <div class="main-wrapper">
+            <header class="top-navbar">
+                <div class="navbar-left">
+                    <button id="toggle-sidebar" class="btn-toggle">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <span class="navbar-title">SISTEMA DE INVENTARIO</span>
+                </div>
+                <div class="navbar-right">
+                    <div class="user-dropdown-container">
+                        <div id="user-dropdown-toggle" class="user-dropdown">
+                            <i class="fa-solid fa-circle-user user-icon"></i>
+                            <span id="user-display-name" class="user-name">Moises Chunga</span>
+                            <i class="fa-solid fa-caret-down"></i>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Contenido específico de Productos -->
+            <main class="content-body">
+                <h1 class="page-title">Gestión de Productos</h1>
+                <div class="card-box">
+                    <p>Aquí va el catálogo y tabla de productos.</p>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script type="module" src="js/guard.js"></script>
+    <script type="module" src="js/layout.js"></script>
+    <script type="module" src="js/productos.js"></script>
+</body>
+</html>
