@@ -422,3 +422,102 @@ body {
 .logout-item:hover {
     background-color: #fff5f5;
 }
+
+/* Transiciones suaves */
+.sidebar {
+    transition: transform 0.3s ease, width 0.3s ease;
+}
+
+.main-wrapper {
+    transition: margin-left 0.3s ease;
+}
+
+/* Estado Colapsado en Escritorio */
+.sidebar.collapsed {
+    width: 70px;
+}
+
+.sidebar.collapsed .brand-name,
+.sidebar.collapsed .menu-item span,
+.sidebar.collapsed .btn-logout span {
+    display: none;
+}
+
+.sidebar.collapsed .menu-item {
+    justify-content: center;
+    padding: 12px;
+}
+
+.main-wrapper.expanded {
+    margin-left: 70px;
+}
+
+/* Capa oscura de fondo para celulares */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 90;
+}
+
+.sidebar-overlay.active {
+    display: block;
+}
+
+/* --- ADAPTACIÓN A CELULARES (RESPONSIVE) --- */
+@media (max-width: 1024px) {
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .charts-grid,
+    .bottom-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        transform: translateX(-100%);
+        z-index: 100;
+        width: 240px !important;
+    }
+
+    .sidebar.show-mobile {
+        transform: translateX(0);
+    }
+
+    .main-wrapper {
+        margin-left: 0 !important;
+    }
+
+    .top-navbar {
+        padding: 0 16px;
+    }
+
+    .navbar-title {
+        font-size: 0.82rem;
+    }
+
+    .kpi-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .content-body {
+        padding: 16px;
+    }
+
+    .kpi-card {
+        padding: 16px;
+    }
+
+    .user-name {
+        font-size: 0.8rem;
+    }
+}
