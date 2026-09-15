@@ -1,67 +1,46 @@
-import { supabase } from './supabase.js';
+import { authService } from './services/session.js';
+import { authMessage } from './services/auth-service.js';
+import { setStatus, setupPasswordToggle } from './utils/auth-ui.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    const loginForm = document.getElementById('form-login');
-    const emailInput = document.getElementById('email');
-    const passwordInput = document.getElementById('password');
-    const togglePassword = document.getElementById('togglePassword');
-    const btnLogin = document.getElementById('btn-login');
-    const statusBadge = document.getElementById('status-badge');
-
-    if (togglePassword && passwordInput) {
-        togglePassword.addEventListener('click', () => {
-            const isPassword = passwordInput.type === 'password';
-            passwordInput.type = isPassword ? 'text' : 'password';
-            togglePassword.classList.toggle('fa-eye', !isPassword);
-            togglePassword.classList.toggle('fa-eye-slash', isPassword);
-        });
+    const form = document.getElementById('form-login');
+    const email = document.getElementById('email');
+    const password = document.getElementById('password');
+    const submit = document.getElementById('btn-login');
+    const recover = document.getElementById('btn-recover');
+    let busy = false;
+    authService.clearLegacySession();
+    setupPasswordToggle();
+    function setBusy(value) {
+        busy = value;
+        submit.disabled = value;
+        recover.disabled = value;
+        form.setAttribute('aria-busy', String(value));
     }
-
-    if (loginForm) {
-        loginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const email = emailInput.value.trim().toLowerCase();
-            const password = passwordInput.value.trim();
-
-            btnLogin.disabled = true;
-            btnLogin.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Verificando...`;
-
-            try {
-                const { data, error } = await supabase
-                    .from('usuarios')
-                    .select('*')
-                    .eq('email', email)
-                    .eq('password', password)
-                    .maybeSingle();
-
-                console.log('Respuesta Supabase:', { data, error });
-
-                if (error) throw new Error('Error de conexión con la base de datos');
-                if (!data) throw new Error('Correo o contraseña incorrectos');
-
-                localStorage.setItem('user_session', JSON.stringify(data));
-
-                statusBadge.className = 'status-badge success';
-                statusBadge.style.backgroundColor = '#d1e7dd';
-                statusBadge.style.color = '#0f5132';
-                statusBadge.style.borderColor = '#badbcc';
-                statusBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> Credenciales correctas. Redirigiendo...`;
-
-                setTimeout(() => {
-                    window.location.href = 'dashboard.html';
-                }, 800);
-
-            } catch (err) {
-                statusBadge.className = 'status-badge danger';
-                statusBadge.style.backgroundColor = '#f8d7da';
-                statusBadge.style.color = '#842029';
-                statusBadge.style.borderColor = '#f5c2c7';
-                statusBadge.innerHTML = `<i class="fa-solid fa-circle-xmark"></i> ${err.message}`;
-
-                btnLogin.disabled = false;
-                btnLogin.innerHTML = `<i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión`;
-            }
-        });
-    }
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (busy || !form.reportValidity()) return;
+        setBusy(true);
+        setStatus('Verificando acceso…');
+        try {
+            await authService.signIn(email.value, password.value);
+            password.value = '';
+            setStatus('Acceso autorizado. Abriendo el inventario…', 'success');
+            window.location.replace('dashboard.html');
+        } catch (error) {
+            password.value = '';
+            setStatus(authMessage(error), 'danger');
+            password.focus();
+        } finally { setBusy(false); }
+    });
+    recover.addEventListener('click', async () => {
+        if (busy || !email.reportValidity()) return;
+        setBusy(true);
+        try {
+            const redirectTo = new URL('restablecer.html', window.location.href).href;
+            await authService.requestPasswordReset(email.value, redirectTo);
+            setStatus('Si el correo tiene una cuenta, recibirás un enlace para cambiar la contraseña. Revisa también el correo no deseado.', 'success');
+        } catch (error) { setStatus(authMessage(error), 'danger'); }
+        finally { setBusy(false); }
+    });
 });
