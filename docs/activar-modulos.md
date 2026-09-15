@@ -21,7 +21,7 @@ Esta entrega no aplica cambios a Supabase ni publica en Vercel. La instalación 
 
 - Conserva los identificadores y los catálogos existentes. Soporta IDs UUID, integer y bigint; las relaciones nuevas usan el mismo tipo.
 - Requiere que inventario y movimientos estén vacíos para iniciar trazabilidad por lotes. Si contienen datos, se detiene: hay que asignar lotes a los saldos y migrar su historial de manera explícita. No se realizan ajustes ficticios.
-- Si inventario o movimientos tienen triggers de negocio anteriores, se detiene para evitar dobles actualizaciones de stock.
+- Si inventario o movimientos tienen triggers de negocio anteriores, se detiene para evitar dobles actualizaciones de stock. La restricción antigua de tipos en `movimientos` sí se reemplaza, porque la tabla existente está vacía y la aplicación necesita traslados y ajustes.
 - Detecta columnas obligatorias desconocidas y tipos incompatibles. Otros índices o restricciones antiguos también pueden requerir adaptación según el esquema.
 - Sustituye las políticas de las tablas gestionadas por los roles descritos abajo. Esta versión concede alcance sobre **todas las sedes de la empresa**. Si ya existen restricciones por sede, revisarlas y adaptarlas ANTES de aplicar.
 - No elimina la tabla `usuarios` antigua ni utiliza sus contraseñas. Sigue bloqueada por la migración de Auth.

@@ -4,7 +4,7 @@
 begin;
 
 do $$
-declare t text; occupied boolean;
+declare t text; occupied boolean; old_check record;
 begin
  if to_regclass('public.auth_perfiles') is null then
   raise exception 'Primero aplica la migración 202609150001_auth_access.sql.';
@@ -17,8 +17,16 @@ begin
    if exists(select 1 from pg_trigger where tgrelid=to_regclass('public.'||t) and not tgisinternal) then
     raise exception 'La tabla % tiene triggers de negocio anteriores. Se deben revisar para no actualizar saldos dos veces.',t;
    end if;
-   if t='movimientos' and exists(select 1 from pg_constraint where conrelid=to_regclass('public.movimientos') and contype='c' and pg_get_constraintdef(oid) ilike '%tipo%') then
-    raise exception 'Movimientos tiene una restricción de tipos anterior. Comparte el esquema para incorporar traslados y ajustes sin conflictos.';
+   -- La tabla antigua puede restringir tipo a entrada/salida. La nueva
+   -- restricción se instala más abajo, después de agregar los tipos nuevos.
+   if t='movimientos' then
+    for old_check in
+     select conname from pg_constraint
+     where conrelid=to_regclass('public.movimientos') and contype='c'
+       and pg_get_constraintdef(oid) ilike '%tipo%'
+    loop
+     execute format('alter table public.movimientos drop constraint %I',old_check.conname);
+    end loop;
    end if;
    execute format('select exists(select 1 from public.%I)',t) into occupied;
    if occupied then raise exception 'La tabla % contiene datos anteriores. Se necesita una migración de saldos e historial a lotes; comparte database/inspeccion.sql. No borres esos datos.',t; end if;
