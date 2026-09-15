@@ -56,6 +56,32 @@ export function createAuthService(client, storage) {
             throw error;
         }
     }
+    async function startPasswordOtp(email, password) {
+        clearLegacySession();
+        const { error } = await client.auth.signInWithPassword({
+            email: email.trim().toLowerCase(), password,
+        });
+        if (error) throw error;
+        // No mantener una sesión autenticada durante el segundo paso.
+        try { await client.auth.signOut({ scope: 'local' }); } catch { /* OTP será el único acceso final. */ }
+        const { error: otpError } = await client.auth.signInWithOtp({
+            email: email.trim().toLowerCase(),
+            options: { shouldCreateUser: false },
+        });
+        if (otpError) throw otpError;
+    }
+    async function verifyEmailOtp(email, token) {
+        const { error } = await client.auth.verifyOtp({
+            email: email.trim().toLowerCase(), token, type: 'email',
+        });
+        if (error) throw error;
+    }
+    async function resendEmailOtp(email) {
+        const { error } = await client.auth.signInWithOtp({
+            email: email.trim().toLowerCase(), options: { shouldCreateUser: false },
+        });
+        if (error) throw error;
+    }
     async function requestPasswordReset(email, redirectTo) {
         const { error } = await client.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo });
         if (error) throw error;
@@ -65,5 +91,5 @@ export function createAuthService(client, storage) {
         const { error } = await client.auth.updateUser({ password });
         if (error) throw error;
     }
-    return { clearLegacySession, requireIdentity, requireAccess, signIn, signOut, requestPasswordReset, updatePassword };
+    return { clearLegacySession, requireIdentity, requireAccess, signIn, signOut, startPasswordOtp, verifyEmailOtp, resendEmailOtp, requestPasswordReset, updatePassword };
 }

@@ -211,5 +211,7 @@ body {
 .status-badge.success { background: #d1e7dd; color: #0f5132; border-color: #badbcc; }
 .toggle-password { background: transparent; border: 0; padding: 6px; }
 .btn-link { display: block; margin: 18px auto 0; border: 0; background: transparent; color: #1e526c; cursor: pointer; text-decoration: underline; font-size: 0.9rem; }
+.otp-help { margin: 0 0 16px; color: #4a5568; font-size: 0.88rem; line-height: 1.45; }
+#otp { text-align: center; letter-spacing: .35em; font-size: 1.35rem; font-weight: 700; }
 button:disabled { opacity: 0.6; cursor: wait; }
 button:focus-visible, a:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }

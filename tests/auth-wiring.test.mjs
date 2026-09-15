@@ -7,7 +7,8 @@ const read = path => readFile(new URL('../' + path, import.meta.url), 'utf8');
 test('la página de login carga el controlador Auth, no la consulta heredada', async () => {
     const [html, controller] = await Promise.all([read('index.html'), read('js/auth.js')]);
     assert.match(html, /src="js\/auth\.js"/);
-    assert.match(controller, /authService\.signIn\(email\.value, password\.value\)/);
+    assert.match(controller, /authService\.startPasswordOtp\(email\.value, password\.value\)/);
+    assert.match(controller, /authService\.verifyEmailOtp\(pendingEmail, otp\.value\)/);
     assert.match(controller, /authService\.requestPasswordReset/);
     assert.doesNotMatch(controller, /\.from\(['"]usuarios['"]\)/);
     assert.doesNotMatch(controller, /console\.log/);
