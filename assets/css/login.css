@@ -205,3 +205,11 @@ body {
         font-size: 0.95rem !important;
     }
 }
+[hidden] { display: none !important; }
+.status-badge.neutral { background: #edf2f7; color: #2d3748; border-color: #cbd5e0; }
+.status-badge.danger { background: #f8d7da; color: #842029; border-color: #f5c2c7; }
+.status-badge.success { background: #d1e7dd; color: #0f5132; border-color: #badbcc; }
+.toggle-password { background: transparent; border: 0; padding: 6px; }
+.btn-link { display: block; margin: 18px auto 0; border: 0; background: transparent; color: #1e526c; cursor: pointer; text-decoration: underline; font-size: 0.9rem; }
+button:disabled { opacity: 0.6; cursor: wait; }
+button:focus-visible, a:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }

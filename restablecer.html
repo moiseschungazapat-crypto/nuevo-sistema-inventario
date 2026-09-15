@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>LA LIGURIA S.A. - Cambiar contraseña</title>
+    <link rel="stylesheet" href="assets/css/login.css">
+</head>
+<body>
+    <main class="login-card">
+        <header class="login-header"><h1>Cambiar contraseña</h1><p>LA LIGURIA S.A.</p></header>
+        <div class="login-body">
+            <div id="status-badge" class="status-badge neutral" role="status" aria-live="polite">Verificando enlace…</div>
+            <form id="form-reset" hidden>
+                <div class="form-group">
+                    <label for="password">Nueva contraseña (mínimo 12 caracteres)</label>
+                    <div class="input-icon-wrapper"><input type="password" id="password" autocomplete="new-password" minlength="12" required></div>
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">Repetir contraseña</label>
+                    <div class="input-icon-wrapper"><input type="password" id="confirm-password" autocomplete="new-password" minlength="12" required></div>
+                </div>
+                <button type="submit" id="btn-save-password" class="btn-submit">Guardar contraseña</button>
+            </form>
+            <a href="index.html" class="btn-link">Volver al inicio de sesión</a>
+            <noscript>Necesitas activar JavaScript para cambiar tu contraseña.</noscript>
+        </div>
+    </main>
+    <script type="module" src="js/restablecer.js"></script>
+</body>
+</html>

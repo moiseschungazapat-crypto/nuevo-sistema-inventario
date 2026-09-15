@@ -10,10 +10,11 @@
     <link rel="stylesheet" href="assets/css/dashboard.css">
     <!-- Chart.js y Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-    <div class="app-layout">
+    <p id="auth-loading" role="status">Verificando acceso… Si no continúa, recarga la página y revisa tu conexión.</p>
+    <noscript>Necesitas activar JavaScript para acceder.</noscript>
+    <div class="app-layout" hidden>
         <!-- Sidebar Izquierdo -->
         <aside class="sidebar">
             <div class="sidebar-brand">
@@ -72,7 +73,7 @@
                     <div class="user-dropdown-container">
                         <div id="user-dropdown-toggle" class="user-dropdown">
                             <i class="fa-solid fa-circle-user user-icon"></i>
-                            <span id="user-display-name" class="user-name">Moises Chunga</span>
+                            <span id="user-display-name" class="user-name">Usuario</span>
                             <i class="fa-solid fa-caret-down"></i>
                         </div>
                         

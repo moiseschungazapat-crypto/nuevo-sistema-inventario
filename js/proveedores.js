@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { escapeHtml } from './utils/html.js';
 
 export async function loadProveedores(container) {
     container.innerHTML = `
@@ -39,10 +40,10 @@ async function fetchProveedores() {
     const tbody = document.getElementById('tabla-proveedores');
     tbody.innerHTML = (data || []).map(p => `
         <tr>
-            <td>${p.nombre}</td>
-            <td>${p.contacto || '-'}</td>
-            <td>${p.telefono || '-'}</td>
-            <td>${p.email || '-'}</td>
+            <td>${escapeHtml(p.nombre)}</td>
+            <td>${escapeHtml(p.contacto || '-')}</td>
+            <td>${escapeHtml(p.telefono || '-')}</td>
+            <td>${escapeHtml(p.email || '-')}</td>
         </tr>
     `).join('');
 }

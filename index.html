@@ -8,8 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Estilos del Login -->
     <link rel="stylesheet" href="assets/css/login.css">
-    <!-- Supabase JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta name="referrer" content="no-referrer">
 </head>
 <body>
     <div class="login-card">
@@ -25,8 +24,8 @@
         <!-- Cuerpo del Formulario -->
         <div class="login-body">
             <!-- Indicador de Estado / Alerta -->
-            <div id="status-badge" class="status-badge success">
-                <i class="fa-solid fa-circle-check"></i> Conexión exitosa con Supabase
+            <div id="status-badge" class="status-badge neutral" role="status" aria-live="polite">
+                Ingresa con tu cuenta de la empresa.
             </div>
 
             <form id="form-login">
@@ -34,7 +33,7 @@
                     <label for="email">Correo Electrónico</label>
                     <div class="input-icon-wrapper">
                         <i class="fa-regular fa-envelope input-icon"></i>
-                        <input type="email" id="email" placeholder="Ingrese su correo electrónico" required>
+                        <input type="email" id="email" name="email" autocomplete="username" placeholder="Ingrese su correo electrónico" required>
                     </div>
                 </div>
 
@@ -42,8 +41,8 @@
                     <label for="password">Contraseña</label>
                     <div class="input-icon-wrapper">
                         <i class="fa-solid fa-lock input-icon"></i>
-                        <input type="password" id="password" placeholder="••••••••" required>
-                        <i class="fa-regular fa-eye toggle-password" id="togglePassword"></i>
+                        <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••" required>
+                        <button type="button" class="toggle-password" id="togglePassword" aria-label="Mostrar contraseña" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button>
                     </div>
                 </div>
 
@@ -51,6 +50,8 @@
                     <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
                 </button>
             </form>
+            <button type="button" id="btn-recover" class="btn-link">Olvidé mi contraseña</button>
+            <noscript>Necesitas activar JavaScript para iniciar sesión.</noscript>
 
             <footer class="login-footer">
                 <p>© 2026 LA LIGURIA S.A. Todos los derechos reservados.</p>

@@ -1,4 +1,5 @@
 import { supabase } from './supabase.js';
+import { escapeHtml } from './utils/html.js';
 
 export async function loadCategorias(container) {
     container.innerHTML = `
@@ -32,7 +33,7 @@ async function fetchCategorias() {
 
     ul.innerHTML = data.map(c => `
         <li class="list-item">
-            <span><strong>${c.nombre}</strong> - ${c.descripcion || 'Sin descripción'}</span>
+            <span><strong>${escapeHtml(c.nombre)}</strong> - ${escapeHtml(c.descripcion || 'Sin descripción')}</span>
         </li>
     `).join('');
 }

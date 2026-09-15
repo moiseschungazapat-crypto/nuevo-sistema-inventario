@@ -1,4 +1,6 @@
 import { supabase } from './supabase.js';
+import { sessionReady } from './guard.js';
+import { escapeHtml } from './utils/html.js';
 
 let chartEntradasSalidasInstance = null;
 let chartEvolucionConsumoInstance = null;
@@ -93,9 +95,9 @@ async function loadDashboardData() {
             if (stockBajoData && stockBajoData.length > 0) {
                 tbody.innerHTML = stockBajoData.map(item => `
                     <tr>
-                        <td>${item.productos?.nombre || 'Producto'}</td>
-                        <td class="text-center"><span class="badge-red">${item.cantidad}</span></td>
-                        <td class="text-center">${item.stock_minimo || 0}</td>
+                        <td>${escapeHtml(item.productos?.nombre || 'Producto')}</td>
+                        <td class="text-center"><span class="badge-red">${escapeHtml(item.cantidad)}</span></td>
+                        <td class="text-center">${escapeHtml(item.stock_minimo || 0)}</td>
                     </tr>
                 `).join('');
             } else {
@@ -121,10 +123,10 @@ async function loadDashboardData() {
                 listMovs.innerHTML = movimientos.map(m => `
                     <div class="recent-item">
                         <div class="item-info">
-                            <p>${m.productos?.nombre || 'Producto'}</p>
+                            <p>${escapeHtml(m.productos?.nombre || 'Producto')}</p>
                             <span>${new Date(m.fecha).toLocaleString()}</span>
                         </div>
-                        <span class="item-amount">-${m.cantidad}</span>
+                        <span class="item-amount">-${escapeHtml(m.cantidad)}</span>
                     </div>
                 `).join('');
             } else {
@@ -146,7 +148,8 @@ async function loadDashboardData() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!await sessionReady) return;
     initCharts();
     loadDashboardData();
 });

@@ -1,4 +1,6 @@
-import { supabase } from './supabase.js';
+import { authService } from './services/session.js';
+import { sessionReady } from './guard.js';
+import { authMessage } from './services/auth-service.js';
 
 export function renderLayout() {
     // 1. Manejo del Sidebar (Abrir / Colapsar / Móvil)
@@ -35,16 +37,9 @@ export function renderLayout() {
 
     // 2. Nombre de usuario activo
     const userDisplayName = document.getElementById('user-display-name');
-    const sessionData = localStorage.getItem('user_session');
-
-    if (sessionData && userDisplayName) {
-        try {
-            const user = JSON.parse(sessionData);
-            userDisplayName.textContent = user.nombre || 'Moises Chunga';
-        } catch (e) {
-            userDisplayName.textContent = 'Moises Chunga';
-        }
-    }
+    sessionReady.then(session => {
+        if (session && userDisplayName) userDisplayName.textContent = session.profile.nombre || 'Usuario';
+    });
 
     // 3. Menú Desplegable (User Dropdown)
     const dropdownToggle = document.getElementById('user-dropdown-toggle');
@@ -66,13 +61,22 @@ export function renderLayout() {
     // 4. Cerrar Sesión
     const handleLogout = async (e) => {
         if (e) e.preventDefault();
-        localStorage.removeItem('user_session');
-        await supabase.auth.signOut();
-        window.location.href = 'index.html';
+        const button = e?.currentTarget;
+        if (button) button.disabled = true;
+        try {
+            await authService.signOut();
+            window.location.replace('index.html');
+        } catch (error) {
+            alert('No se pudo cerrar la sesión. ' + authMessage(error));
+        } finally {
+            if (button) button.disabled = false;
+        }
     };
 
     document.getElementById('btn-logout')?.addEventListener('click', handleLogout);
     document.getElementById('btn-dropdown-logout')?.addEventListener('click', handleLogout);
 }
 
-document.addEventListener('DOMContentLoaded', renderLayout);
+document.addEventListener('DOMContentLoaded', async () => {
+    if (await sessionReady) renderLayout();
+});

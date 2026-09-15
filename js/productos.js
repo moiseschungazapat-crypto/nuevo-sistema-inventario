@@ -1,9 +1,12 @@
 import { supabase } from './supabase.js';
+import { sessionReady } from './guard.js';
+import { escapeHtml } from './utils/html.js';
 
 let productosData = [];
 let categoriasData = [];
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!await sessionReady) return;
     initProductosEvents();
     loadCategorias();
     loadProductos();
@@ -56,7 +59,7 @@ async function loadCategorias() {
         const selectFilter = document.getElementById('select-filter-categoria');
         const selectForm = document.getElementById('categoria_id');
 
-        const optionsHtml = categoriasData.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+        const optionsHtml = categoriasData.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.nombre)}</option>`).join('');
 
         if (selectFilter) {
             selectFilter.innerHTML = `<option value="">Todas las Categorías</option>${optionsHtml}`;
@@ -144,13 +147,13 @@ function renderTablaProductos() {
 
     tbody.innerHTML = filtrados.map(prod => `
         <tr>
-            <td><strong>${prod.codigo || 'S/N'}</strong></td>
+            <td><strong>${escapeHtml(prod.codigo || 'S/N')}</strong></td>
             <td>
-                <div><strong>${prod.nombre}</strong></div>
-                ${prod.descripcion ? `<small class="text-muted">${prod.descripcion}</small>` : ''}
+                <div><strong>${escapeHtml(prod.nombre)}</strong></div>
+                ${prod.descripcion ? `<small class="text-muted">${escapeHtml(prod.descripcion)}</small>` : ''}
             </td>
-            <td><span class="badge-blue">${prod.categorias?.nombre || 'Sin Categoría'}</span></td>
-            <td>${prod.unidad_medida || 'kg'}</td>
+            <td><span class="badge-blue">${escapeHtml(prod.categorias?.nombre || 'Sin Categoría')}</span></td>
+            <td>${escapeHtml(prod.unidad_medida || 'kg')}</td>
             <td class="text-right">S/. ${parseFloat(prod.precio || 0).toFixed(2)}</td>
             <td class="text-center">
                 <span class="${prod.estado !== false ? 'badge-green' : 'badge-red'}">
@@ -158,10 +161,10 @@ function renderTablaProductos() {
                 </span>
             </td>
             <td class="text-center">
-                <button class="btn-action edit" data-id="${prod.id}" title="Editar">
+                <button class="btn-action edit" data-id="${escapeHtml(prod.id)}" title="Editar">
                     <i class="fa-solid fa-pen-to-square"></i>
                 </button>
-                <button class="btn-action delete" data-id="${prod.id}" title="Eliminar">
+                <button class="btn-action delete" data-id="${escapeHtml(prod.id)}" title="Eliminar">
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </td>
