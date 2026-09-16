@@ -215,3 +215,5 @@ body {
 #otp { text-align: center; letter-spacing: .35em; font-size: 1.35rem; font-weight: 700; }
 button:disabled { opacity: 0.6; cursor: wait; }
 button:focus-visible, a:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
+
+.login-steps{display:flex;align-items:center;gap:22px;margin:0 0 18px;color:#a0aec0;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em}.login-step{display:flex;align-items:center;gap:7px;position:relative}.login-step:first-child:after{content:'';width:18px;height:2px;background:#d8dee6;position:absolute;left:calc(100% + 2px);top:50%}.login-step i{width:23px;height:23px;border-radius:50%;display:grid;place-items:center;background:#e8edf2;color:#64748b;font-size:.65rem;font-style:normal}.login-step.active{color:#192a32}.login-step.active i{background:#192a32;color:white}.otp-step-hidden{}.sidebar-toggle{margin-left:auto;background:transparent;border:0;color:#4a5568;cursor:pointer;padding:6px;font-size:1.05rem}.sidebar-toggle:focus-visible{outline:3px solid #2563eb;outline-offset:2px}

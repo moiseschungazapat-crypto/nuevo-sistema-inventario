@@ -8,7 +8,7 @@ export function mountShell() {
  document.getElementById('app-root').innerHTML = `
  <div class="app-layout" hidden>
  <aside class="sidebar">
- <div class="sidebar-brand"><img src="img/logo.png" alt="" class="brand-logo"><span class="brand-name">LA LIGURIA S.A.</span></div>
+ <div class="sidebar-brand"><img src="img/logo.png" alt="" class="brand-logo"><span class="brand-name">LA LIGURIA S.A.</span><button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-label="Colapsar menú"><i class="fa-solid fa-bars"></i></button></div>
  <nav class="sidebar-menu" aria-label="Menú principal">${sections.map(([key,label,icon])=>`<a href="${key}.html" class="menu-item ${key===section?'active':''}" ${key===section?'aria-current="page"':''}><i class="fa-solid fa-${icon}" aria-hidden="true"></i><span>${label}</span></a>`).join('')}</nav>
  <div class="sidebar-footer"><button id="btn-logout" class="btn-logout"><i class="fa-solid fa-power-off" aria-hidden="true"></i><span>Cerrar sesión</span></button></div>
  </aside>

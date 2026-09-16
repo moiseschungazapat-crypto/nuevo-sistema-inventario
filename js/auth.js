@@ -30,6 +30,8 @@ document.addEventListener('DOMContentLoaded', () => {
         pendingEmail = email.value.trim().toLowerCase();
         credentialsStep.hidden = true;
         otpStep.hidden = false;
+        document.getElementById('step-credentials')?.classList.remove('active');
+        document.getElementById('step-otp')?.classList.add('active');
         otp.value = '';
         submit.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Verificar código';
         setStatus('Te enviamos un código de 6 dígitos. Caduca pronto.', 'success');
@@ -39,6 +41,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function showCredentialsStep() {
         credentialsStep.hidden = false;
         otpStep.hidden = true;
+        document.getElementById('step-credentials')?.classList.add('active');
+        document.getElementById('step-otp')?.classList.remove('active');
         submit.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> Iniciar sesión';
         setStatus('Ingresa con tu cuenta de la empresa.');
         otp.value = '';

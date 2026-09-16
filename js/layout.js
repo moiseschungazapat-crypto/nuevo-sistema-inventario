@@ -5,6 +5,7 @@ import { authMessage } from './services/auth-service.js';
 export function renderLayout() {
     // 1. Manejo del Sidebar (Abrir / Colapsar / Móvil)
     const toggleBtn = document.getElementById('toggle-sidebar');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
     const sidebar = document.querySelector('.sidebar');
     const mainWrapper = document.querySelector('.main-wrapper');
 
@@ -16,8 +17,8 @@ export function renderLayout() {
         document.body.appendChild(overlay);
     }
 
-    if (toggleBtn && sidebar) {
-        toggleBtn.addEventListener('click', (e) => {
+    if (sidebar && (toggleBtn || sidebarToggle)) {
+        const toggleSidebar = (e) => {
             e.stopPropagation();
             if (window.innerWidth <= 768) {
                 sidebar.classList.toggle('show-mobile');
@@ -26,7 +27,9 @@ export function renderLayout() {
                 sidebar.classList.toggle('collapsed');
                 if (mainWrapper) mainWrapper.classList.toggle('expanded');
             }
-        });
+        };
+        toggleBtn?.addEventListener('click', toggleSidebar);
+        sidebarToggle?.addEventListener('click', toggleSidebar);
 
         // Cerrar menú móvil al hacer clic en el overlay
         overlay.addEventListener('click', () => {
