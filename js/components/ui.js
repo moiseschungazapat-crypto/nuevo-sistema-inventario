@@ -43,6 +43,10 @@ export function openEditor({title, fields, save, setup}) {
   busy = true; button.disabled = true; button.textContent = 'Guardando…'; error.textContent = '';
   try {
    const values = Object.fromEntries(new FormData(form));
+   // Keep the native form available to flows that need files (FileList is not
+   // preserved by Object.fromEntries). It is non-enumerable so callers can
+   // still treat `values` as a normal form object.
+   Object.defineProperty(values, '__form', { value: form, enumerable: false });
    await save(values); dialog.close();
   } catch (err) { error.textContent = message(err); }
   finally { busy = false; button.disabled = false; button.textContent = 'Guardar'; }

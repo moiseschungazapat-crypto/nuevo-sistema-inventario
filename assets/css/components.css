@@ -1,4 +1,6 @@
 [hidden]{display:none!important}
+.reception-line{grid-column:1/-1;display:grid;grid-template-columns:2fr 2fr 1fr 1fr 1fr;gap:10px;padding:12px 0;border-top:1px solid #e2e8f0}
+@media(max-width:768px){.reception-line{grid-template-columns:1fr 1fr}}
 body{font-size:14px;line-height:1.5}button,input,select,textarea{font:inherit}
 button,a,input,select,textarea{outline-offset:3px}button:focus-visible,a:focus-visible{outline:3px solid #2563eb}
 .sidebar{overflow-y:auto}.main-wrapper{min-width:0}.content-body{max-width:1660px;width:100%;margin:0 auto;padding:28px}
