@@ -1,6 +1,6 @@
 const sections = [
  ['dashboard','Dashboard','house'], ['productos','Productos','box'], ['categorias','Categorías','tag'],
- ['proveedores','Proveedores','truck'], ['sedes','Sedes','building'], ['inventario','Inventario','boxes-stacked'],
+ ['proveedores','Proveedores','truck'], ['sedes','Sedes','building'], ['recepciones','Recepciones','cart-shopping'], ['inventario','Inventario','boxes-stacked'],
  ['movimientos','Movimientos','arrow-right-arrow-left'], ['reportes','Reportes','chart-line'], ['auditoria','Auditoría','clipboard-list'], ['usuarios','Usuarios','users'],
 ];
 export function mountShell() {
