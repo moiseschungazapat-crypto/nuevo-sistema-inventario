@@ -42,7 +42,7 @@ Este documento no crea registros. Reúne descripciones que se leen en las imáge
 | Dkasa floral antibacterial 4 L | unidad | Limpieza | No |
 | Vela mixta de 24 la docena | unidad | Abarrotes | No |
 
-## Proveedores cuyo nombre se lee, pero cuyo RUC debe confirmarse
+## Proveedores de inventario cuyo nombre se lee, pero cuyo RUC debe confirmarse
 
 Los nombres se dejan en el catálogo como referencia. No se completó un RUC ilegible: debe verificarse en la factura original o en SUNAT antes de usarlo como documento fiscal.
 
@@ -56,6 +56,10 @@ Los nombres se dejan en el catálogo como referencia. No se completó un RUC ile
 - Mave Fest / Matías Cottina Peter Luis
 - Corzel S.R.L.
 - Makro Supermayorista S.A.
+
+## Proveedores que no se cargan al inventario inicial
+
+Estas facturas corresponden a servicios, activos o gastos operativos. Se conservan como referencia documental, pero no se crean como proveedores del catálogo de inventario: Gasolineras S.A.C., Grupo Diseda S.A.C., IM Publicidad Gráfica S.A.C., Perú Desfumi E.I.R.L., Servicios Múltiples Gedefa S.R.L., C.R.A. Investment S.A.C., Mave Fest / Matías Cottina Peter Luis y Corzel S.R.L.
 
 ## Datos que todavía debe aportar la empresa
 

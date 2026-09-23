@@ -11,7 +11,7 @@ export async function catalogPage(root, section, access) {
  const config = catalogConfig[section], canWrite = access.rol !== 'consulta';
  let rows = [], categories = [], page = 0;
  root.innerHTML = heading(config.title, config.description, canWrite ? '<button class="button primary" id="new-record">+ Nuevo registro</button>':'') +
- '<section class="panel"><div class="toolbar"><label class="search-label">Buscar<input type="search" id="search" placeholder="Nombre, código o contacto…"></label><label>Estado<select id="status"><option value="">Todos</option><option value="true">Activos</option><option value="false">Inactivos</option></select></label><button class="button" id="refresh">Actualizar</button></div><div id="results"></div><div id="pager" class="pagination"></div></section>';
+ '<section class="panel"><div class="toolbar"><label class="search-label">Buscar<input type="search" id="search" placeholder="Nombre, código o contacto…"></label><label>Estado<select id="status"><option value="true" selected>Activos</option><option value="">Todos</option><option value="false">Inactivos</option></select></label><button class="button" id="refresh">Actualizar</button></div><div id="results"></div><div id="pager" class="pagination"></div></section>';
  function render() {
   const query = root.querySelector('#search').value.toLocaleLowerCase().trim(), status = root.querySelector('#status').value;
   const filtered = rows.filter(row => (status==='' || String(row.estado)===status) && [row.nombre,row.codigo,row.contacto,row.documento,row.email].some(v=>String(v||'').toLocaleLowerCase().includes(query)));
