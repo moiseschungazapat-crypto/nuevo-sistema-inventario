@@ -5,7 +5,7 @@ export const catalogConfig = {
  categorias: {title:'Categorías', singular:'categoría', description:'Organiza los productos y conserva su clasificación.', fields:[['nombre','Nombre'],['descripcion','Descripción','textarea']], columns:['Nombre','Descripción','Estado']},
  proveedores: {title:'Proveedores', singular:'proveedor', description:'Directorio de empresas y contactos de abastecimiento.', fields:[['nombre','Razón social / nombre'],['documento','RUC / documento'],['contacto','Persona de contacto'],['telefono','Teléfono','tel'],['email','Correo','email'],['direccion','Dirección']], columns:['Proveedor','Documento','Contacto','Teléfono','Correo','Estado']},
  sedes: {title:'Sedes', singular:'sede', description:'Locales y almacenes que comparten este inventario.', fields:[['nombre','Nombre'],['direccion','Dirección'],['responsable','Responsable']], columns:['Sede','Dirección','Responsable','Estado']},
- productos: {title:'Productos', singular:'producto', description:'Catálogo compartido. Las cantidades se registran mediante movimientos.', fields:[['codigo','Código / SKU'],['nombre','Nombre'],['descripcion','Descripción','textarea'],['precio','Precio de referencia (S/)','number']], columns:['Código','Producto','Categoría','Unidad','Precio de referencia','Estado']},
+ productos: {title:'Productos', singular:'producto', description:'Catálogo compartido. Las cantidades se registran mediante movimientos.', fields:[['codigo','Código / SKU'],['nombre','Nombre'],['descripcion','Descripción','textarea'],['marca','Marca'],['presentacion','Presentación'],['codigo_barras','Código de barras'],['precio','Precio de referencia (S/)','number']], columns:['Código','Producto','Categoría','Unidad','Tipo','Control de stock','Precio de referencia','Estado']},
 };
 export async function catalogPage(root, section, access) {
  const config = catalogConfig[section], canWrite = access.rol !== 'consulta';
@@ -22,7 +22,7 @@ export async function catalogPage(root, section, access) {
    if(section==='categorias') cells=[e(row.nombre), e(row.descripcion||'—'),state];
    if(section==='proveedores') cells=[e(row.nombre),e(row.documento||'—'),e(row.contacto||'—'),e(row.telefono||'—'),e(row.email||'—'),state];
    if(section==='sedes') cells=[e(row.nombre),e(row.direccion||'—'),e(row.responsable||'—'),state];
-   if(section==='productos') cells=[e(row.codigo),e(row.nombre),e(categories.find(c=>String(c.id)===String(row.categoria_id))?.nombre||'Sin categoría'),e(row.unidad_medida),'S/ '+quantity(row.precio),state];
+   if(section==='productos') cells=[e(row.codigo),e(row.nombre),e(categories.find(c=>String(c.id)===String(row.categoria_id))?.nombre||'Sin categoría'),e(row.unidad_medida),e({producto:'Producto',servicio:'Servicio',activo:'Activo',gasto:'Gasto'}[row.tipo_item]||'Producto'),row.controla_inventario===false?badge('No genera stock','neutral'):badge('Sí','success'),row.precio_confirmado&&Number(row.precio)>0?'S/ '+quantity(row.precio):'Sin dato',state];
    if(canWrite) cells.push(`<button class="button small" data-edit="${e(row.id)}">Editar</button>`);
    return cells;
   });
@@ -41,14 +41,19 @@ export async function catalogPage(root, section, access) {
   const controls = config.fields.map(([name,label,type='text'])=>field(name,label,{value:record[name]??'',type,required:['nombre','codigo'].includes(name),min:type==='number'?0:undefined,step:type==='number'?'0.01':undefined,maxLength:name==='descripcion'?1000:200}));
   if(section==='productos') controls.push(
    field('categoria_id','Categoría',{choices:options(categories,record.categoria_id,'Sin categoría')}),
-   field('unidad_medida','Unidad base',{choices:['kg','g','litro','ml','unidad','caja','paquete'].map(value=>`<option ${(record.unidad_medida||'unidad')===value?'selected':''}>${value}</option>`).join(''),help:'No cambiar después de registrar existencias.'}));
+   field('unidad_medida','Unidad base',{choices:['kg','g','litro','ml','unidad','caja','paquete'].map(value=>`<option ${(record.unidad_medida||'unidad')===value?'selected':''}>${value}</option>`).join(''),help:'No cambiar después de registrar existencias.'}),
+   field('precio_confirmado','Precio confirmado',{choices:`<option value="false" ${record.precio_confirmado?'':'selected'}>No, todavía no</option><option value="true" ${record.precio_confirmado?'selected':''}>Sí, según documento validado</option>`}),
+   field('tipo_item','Tipo de registro',{choices:`<option value="producto" ${record.tipo_item!=='servicio'&&record.tipo_item!=='activo'&&record.tipo_item!=='gasto'?'selected':''}>Producto</option><option value="servicio" ${record.tipo_item==='servicio'?'selected':''}>Servicio</option><option value="activo" ${record.tipo_item==='activo'?'selected':''}>Activo / equipo</option><option value="gasto" ${record.tipo_item==='gasto'?'selected':''}>Gasto</option>`}),
+   field('controla_inventario','Controla existencias',{choices:`<option value="true" ${record.controla_inventario!==false?'selected':''}>Sí, usa lotes y saldos</option><option value="false" ${record.controla_inventario===false?'selected':''}>No, solo historial de compra</option>`,help:'Servicios, combustibles, mantenimiento y equipos normalmente no aumentan el stock.'}),
+   field('es_perecible','Es perecible',{choices:`<option value="false" ${record.es_perecible?'':'selected'}>No</option><option value="true" ${record.es_perecible?'selected':''}>Sí</option>`}),
+   field('requiere_lote','Requiere lote',{choices:`<option value="true" ${record.controla_inventario!==false?'selected':''}>Sí</option><option value="false" ${record.controla_inventario===false?'selected':''}>No</option>`,help:'Los artículos de stock usan lotes para conservar trazabilidad; los servicios no.'}));
   controls.push(field('estado','Estado',{choices:`<option value="true" ${record.estado!==false?'selected':''}>Activo</option><option value="false" ${record.estado===false?'selected':''}>Inactivo</option>`}));
   openEditor({title:(original?'Editar ':'Nueva ficha de ')+config.singular,fields:controls.join(''),save:async values=>{
    for(const key of Object.keys(values)) values[key]=values[key].trim();
    if(!values.nombre || (section==='productos'&&!values.codigo)) throw new Error('Completa los campos obligatorios.');
    values.estado=values.estado==='true';
-   if(section==='productos') {
-    values.precio=Number(values.precio||0); values.categoria_id=values.categoria_id||null;
+    if(section==='productos') {
+    values.precio=Number(values.precio||0); values.categoria_id=values.categoria_id||null; values.precio_confirmado=values.precio_confirmado==='true'&&values.precio>0; values.controla_inventario=values.controla_inventario==='true'; values.es_perecible=values.es_perecible==='true'; values.requiere_lote=values.controla_inventario;
     if(!Number.isFinite(values.precio)||values.precio<0) throw new Error('El precio debe ser cero o mayor.');
    }
    await saveRecord(section,values,original); notice('Registro guardado.'); await refresh();

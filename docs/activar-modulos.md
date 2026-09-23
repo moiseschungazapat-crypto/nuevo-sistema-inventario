@@ -10,10 +10,13 @@ Esta entrega no aplica cambios a Supabase ni publica en Vercel. La instalación 
 
 1. **Respaldar y preparar una ventana de mantenimiento.** Probar primero en un proyecto de ensayo si está disponible.
 2. Ejecutar UNA VEZ el archivo completo `supabase/migrations/202609150002_inventory_modules.sql` en Supabase → SQL Editor. La migración de Auth anterior debe estar instalada.
-3. Ejecutar `database/habilitar-administrador.sql`. Está preparado para el correo que ya habilitaste. Esto te asigna administrador sin cambiar tu contraseña.
-4. Publicar los archivos completos del proyecto y abrir el despliegue nuevo en Vercel. Mantener el proyecto como sitio estático, sin framework ni comando de compilación. Las dependencias de desarrollo son solo para pruebas.
-5. Cerrar y volver a iniciar sesión. El encabezado debe mostrar tu rol.
-6. Realizar la prueba operativa siguiente antes de cargar datos de la empresa.
+3. Ejecutar `supabase/migrations/202609150004_recepciones.sql` y después `supabase/migrations/202609150005_storage_recepciones.sql`. En Storage debe existir un bucket **privado** llamado `documentos-recepcion`.
+4. Ejecutar `supabase/migrations/202609150006_catalogo_recepciones.sql`. Esta migración agrega la clasificación producto/servicio/activo/gasto, los datos financieros de la factura, archivos y la regla que evita aumentar stock por servicios.
+5. Ejecutar `supabase/migrations/202609150007_catalogo_facturas3.sql`. Solo carga categorías, proveedores y productos con datos que se leen en Facturas 3; no carga cantidades ni inventa códigos, lotes o RUC ilegibles.
+6. Ejecutar `database/habilitar-administrador.sql`. Está preparado para el correo que ya habilitaste. Esto te asigna administrador sin cambiar tu contraseña.
+7. Publicar los archivos completos del proyecto y abrir el despliegue nuevo en Vercel. Mantener el proyecto como sitio estático, sin framework ni comando de compilación. Las dependencias de desarrollo son solo para pruebas.
+8. Cerrar y volver a iniciar sesión. El encabezado debe mostrar tu rol.
+9. Realizar la prueba operativa siguiente antes de cargar datos de la empresa.
 
 **Si el SQL devuelve un error, no sigas con fragmentos sueltos y no borres tablas.** La transacción revierte los cambios. Comparte el mensaje y los resultados de `database/inspeccion.sql` para adaptar la migración.
 
@@ -66,7 +69,7 @@ Usuarios administra los perfiles de cuentas Auth existentes. **Crear o invitar c
 - Los mínimos corresponden a producto/sede y comparan existencias físicas, incluyendo lotes vencidos; las alertas de vencimiento se muestran por separado.
 - Los ajustes son incrementos o disminuciones justificados. Para corregir un movimiento, registrar el ajuste correspondiente y referenciar el documento original. No existe un botón de anulación automática.
 - El precio del catálogo es referencial; los reportes no lo presentan como costo contable.
-- Proveedores funciona como directorio; no hay órdenes de compra ni vinculación automática proveedor/lote en esta versión.
+- Proveedores funciona como directorio y ahora puede relacionarse con productos mediante `proveedor_productos`. La orden de compra y los datos de guía se conservan en la recepción cuando el personal los registra.
 
 ## Sincronización y reintentos
 

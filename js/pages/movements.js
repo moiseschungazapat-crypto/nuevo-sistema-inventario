@@ -35,6 +35,7 @@ export async function movementsPage(root,access,report=false){
  }
  async function loadLookups(){
   [products,sites,lots,stock]=await Promise.all([allRows('productos'),allRows('sedes'),allRows('lotes'),allRows('app_stock')]);
+  products=products.filter(product=>product.controla_inventario!==false);
   for(const [id,rows] of [['product',products],['site',sites]]){
    const node=root.querySelector('#'+id),current=node.value;node.innerHTML=options(rows,current,'Todos');
   }
@@ -47,7 +48,7 @@ export async function movementsPage(root,access,report=false){
   const allowed=Object.entries(labels).filter(([key])=>access.rol==='administrador'||!key.startsWith('ajuste'));
   openEditor({title:pending?'Reintentar movimiento pendiente':'Registrar movimiento',fields:
    field('tipo','Tipo',{choices:allowed.map(([key,label])=>`<option value="${key}" ${key===data.tipo?'selected':''}>${label}</option>`).join('')})+
-   field('producto_id','Producto',{required:true,choices:options(products.filter(p=>p.estado||String(p.id)===data.producto_id),data.producto_id)})+
+   field('producto_id','Producto',{required:true,choices:options(products.filter(p=>(p.estado||String(p.id)===data.producto_id)&&p.controla_inventario!==false),data.producto_id)})+
    field('lote_id','Lote',{required:true,choices:'',help:'Para crear un lote, utiliza Inventario → Nuevo lote.'})+
    field('sede_id','Sede (origen en traslados)',{required:true,choices:options(sites.filter(s=>s.estado||String(s.id)===data.sede_id),data.sede_id)})+
    field('destino_id','Sede de destino',{choices:options(sites.filter(s=>s.estado),data.destino_id)})+

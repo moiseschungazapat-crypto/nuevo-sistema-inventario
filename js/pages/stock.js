@@ -35,7 +35,7 @@ export async function stockPage(root, access) {
   }catch(error){loadError(error);}
  }
  root.querySelector('#new-lot')?.addEventListener('click',()=>{
-  openEditor({title:'Registrar lote',fields:field('producto_id','Producto',{required:true,choices:options(products.filter(p=>p.estado))})+field('codigo','Código de lote',{required:true,maxLength:100})+field('vencimiento','Fecha de vencimiento',{type:'date',required:true}),save:async values=>{
+  openEditor({title:'Registrar lote',fields:field('producto_id','Producto',{required:true,choices:options(products.filter(p=>p.estado&&p.controla_inventario!==false))})+field('codigo','Código de lote',{required:true,maxLength:100})+field('vencimiento','Fecha de vencimiento',{type:'date',required:true}),save:async values=>{
    await rpc('app_crear_lote',{p_producto:values.producto_id,p_codigo:values.codigo.trim(),p_vencimiento:values.vencimiento}); notice('Lote registrado. Ahora puedes registrar su entrada.');await refresh();
   }});
  });
