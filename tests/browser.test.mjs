@@ -28,11 +28,11 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
   page.on('pageerror',error=>errors.push(error.message));
   const base='http://127.0.0.1:'+server.address().port;
   await mkdir(resolve(root,'test-results'),{recursive:true});
-  await t.test('las nueve páginas comparten menú y cargan sin errores',async()=>{
+  await t.test('las páginas verificadas comparten menú y cargan sin errores',async()=>{
    for(const section of ['dashboard','productos','categorias','proveedores','sedes','inventario','movimientos','reportes','usuarios']){
     await page.goto(base+'/'+section+'.html');
     await page.locator('#sync-state.connected').waitFor();
-    assert.equal(await page.locator('.sidebar-menu a').count(),9);
+    assert.equal(await page.locator('.sidebar-menu a').count(),11);
     assert.equal(await page.locator('.menu-item.active').getAttribute('href'),section+'.html');
     assert.equal(await page.locator('#load-error:visible').count(),0);
    }
@@ -82,7 +82,13 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
   });
   await t.test('dashboard y móvil mantienen contenido accesible',async()=>{
    await page.goto(base+'/dashboard.html');await page.locator('.activity-column').first().waitFor();
+   await page.evaluate(()=>localStorage.removeItem('liguria-theme'));await page.reload();await page.locator('.activity-column').first().waitFor();
+   await page.locator('#theme-toggle').click();
+   assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
+   assert.equal(await page.locator('#theme-toggle').getAttribute('aria-pressed'),'true');
    await page.screenshot({path:resolve(root,'test-results/dashboard-desktop.png'),fullPage:true});
+   await page.goto(base+'/inventario.html');await page.locator('#new-lot').waitFor();
+   assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
    await page.setViewportSize({width:390,height:844});await page.goto(base+'/inventario.html');
    await page.locator('#new-lot').waitFor();await page.locator('#toggle-sidebar').click();
    assert.equal(await page.locator('.sidebar').evaluate(el=>el.classList.contains('show-mobile')),true);

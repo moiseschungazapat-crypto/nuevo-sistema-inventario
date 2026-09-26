@@ -1,8 +1,11 @@
 import { authService } from './services/session.js';
 import { sessionReady } from './guard.js';
 import { authMessage } from './services/auth-service.js';
+import { setupThemeToggle } from './theme.js';
 
 export function renderLayout() {
+    setupThemeToggle();
+
     // 1. Manejo del Sidebar (Abrir / Colapsar / Móvil)
     const toggleBtn = document.getElementById('toggle-sidebar');
     const sidebarToggle = document.getElementById('sidebar-toggle');

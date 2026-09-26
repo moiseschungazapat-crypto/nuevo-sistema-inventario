@@ -1,3 +1,5 @@
+import '../theme.js';
+
 const sections = [
  ['dashboard','Dashboard','house'], ['productos','Productos','box'], ['categorias','Categorías','tag'],
  ['proveedores','Proveedores','truck'], ['sedes','Sedes','building'], ['recepciones','Recepciones','cart-shopping'], ['inventario','Inventario','boxes-stacked'],
@@ -14,7 +16,7 @@ export function mountShell() {
  </aside>
  <div class="main-wrapper">
  <header class="top-navbar"><div class="navbar-left"><button id="toggle-sidebar" class="btn-toggle" aria-label="Abrir o cerrar menú"><i class="fa-solid fa-bars"></i></button><span class="navbar-title">CONTROL DE INVENTARIO</span></div>
- <div class="account"><span id="sync-state" class="sync-state">Conectando…</span><span id="user-display-name">Usuario</span><span id="user-role" class="badge-blue"></span></div></header>
+ <div class="account"><button type="button" id="theme-toggle" class="theme-toggle" aria-label="Cambiar a modo oscuro" aria-pressed="false"><i class="fa-solid fa-moon" data-theme-icon aria-hidden="true"></i><span data-theme-label>Modo oscuro</span></button><span id="sync-state" class="sync-state">Conectando…</span><span id="user-display-name">Usuario</span><span id="user-role" class="badge-blue"></span></div></header>
  <main class="content-body" id="page-content"><div class="loading">Cargando sección…</div></main>
  <footer class="app-footer">LA LIGURIA S.A. · Inventario por sede y lote</footer>
  </div></div>
