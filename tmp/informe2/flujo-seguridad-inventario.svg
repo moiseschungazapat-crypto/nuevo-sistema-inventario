@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1040" viewBox="0 0 1400 1040">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 Z" fill="#51606f"/>
+    </marker>
+    <style>
+      .title { font: 700 34px Arial, sans-serif; fill: #0b2e6b; }
+      .box-title { font: 700 27px Arial, sans-serif; fill: #16202a; }
+      .box-text { font: 400 23px Arial, sans-serif; fill: #263442; }
+      .step { font: 700 24px Arial, sans-serif; fill: #ffffff; }
+    </style>
+  </defs>
+  <rect width="1400" height="1040" fill="#ffffff"/>
+  <text x="700" y="46" text-anchor="middle" class="title">FLUJO DE ACCESO Y ACTUALIZACIÓN DE INVENTARIO</text>
+
+  <g>
+    <circle cx="135" cy="133" r="31" fill="#0b2e6b"/><text x="135" y="142" text-anchor="middle" class="step">1</text>
+    <rect x="205" y="82" width="990" height="102" rx="18" fill="#eaf2ff" stroke="#0b2e6b" stroke-width="3"/>
+    <text x="700" y="124" text-anchor="middle" class="box-title">Ingreso de credenciales</text>
+    <text x="700" y="158" text-anchor="middle" class="box-text">El usuario registra correo y contraseña.</text>
+
+    <line x1="700" y1="184" x2="700" y2="221" stroke="#51606f" stroke-width="4" marker-end="url(#arrow)"/>
+    <circle cx="135" cy="282" r="31" fill="#0b2e6b"/><text x="135" y="291" text-anchor="middle" class="step">2</text>
+    <rect x="205" y="231" width="990" height="102" rx="18" fill="#eaf2ff" stroke="#0b2e6b" stroke-width="3"/>
+    <text x="700" y="273" text-anchor="middle" class="box-title">Segundo paso OTP</text>
+    <text x="700" y="307" text-anchor="middle" class="box-text">Supabase envía y verifica el código de 6 dígitos.</text>
+
+    <line x1="700" y1="333" x2="700" y2="370" stroke="#51606f" stroke-width="4" marker-end="url(#arrow)"/>
+    <circle cx="135" cy="431" r="31" fill="#0b2e6b"/><text x="135" y="440" text-anchor="middle" class="step">3</text>
+    <rect x="205" y="380" width="990" height="102" rx="18" fill="#f0f5f9" stroke="#3d566e" stroke-width="3"/>
+    <text x="700" y="422" text-anchor="middle" class="box-title">Autorización</text>
+    <text x="700" y="456" text-anchor="middle" class="box-text">Se valida perfil activo, rol y políticas RLS.</text>
+
+    <line x1="700" y1="482" x2="700" y2="519" stroke="#51606f" stroke-width="4" marker-end="url(#arrow)"/>
+    <circle cx="135" cy="580" r="31" fill="#0b2e6b"/><text x="135" y="589" text-anchor="middle" class="step">4</text>
+    <rect x="205" y="529" width="990" height="102" rx="18" fill="#f0f5f9" stroke="#3d566e" stroke-width="3"/>
+    <text x="700" y="571" text-anchor="middle" class="box-title">Registro de la operación</text>
+    <text x="700" y="605" text-anchor="middle" class="box-text">Entrada, salida, traslado o ajuste con sede y lote.</text>
+
+    <line x1="700" y1="631" x2="700" y2="668" stroke="#51606f" stroke-width="4" marker-end="url(#arrow)"/>
+    <circle cx="135" cy="729" r="31" fill="#0b2e6b"/><text x="135" y="738" text-anchor="middle" class="step">5</text>
+    <rect x="205" y="678" width="990" height="102" rx="18" fill="#fff7e6" stroke="#b67600" stroke-width="3"/>
+    <text x="700" y="720" text-anchor="middle" class="box-title">Validación transaccional en PostgreSQL</text>
+    <text x="700" y="754" text-anchor="middle" class="box-text">Controla cantidad, vencimiento, stock e idempotencia.</text>
+
+    <line x1="700" y1="780" x2="700" y2="817" stroke="#51606f" stroke-width="4" marker-end="url(#arrow)"/>
+    <circle cx="135" cy="878" r="31" fill="#0b2e6b"/><text x="135" y="887" text-anchor="middle" class="step">6</text>
+    <rect x="205" y="827" width="990" height="102" rx="18" fill="#e9f7ef" stroke="#23834a" stroke-width="3"/>
+    <text x="700" y="869" text-anchor="middle" class="box-title">Resultado y trazabilidad</text>
+    <text x="700" y="903" text-anchor="middle" class="box-text">Actualiza stock, auditoría, dashboard y reportes mediante Realtime.</text>
+
+    <line x1="700" y1="929" x2="700" y2="974" stroke="#51606f" stroke-width="4" marker-end="url(#arrow)"/>
+    <rect x="500" y="984" width="400" height="46" rx="23" fill="#0b2e6b"/>
+    <text x="700" y="1016" text-anchor="middle" class="step">OPERACIÓN CONFIRMADA</text>
+  </g>
+</svg>

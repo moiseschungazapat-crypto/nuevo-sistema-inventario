@@ -1,0 +1,70 @@
+{
+  "input": "C:\\Users\\HP\\Downloads\\CNIU-108 INFORME FPE (1).docx",
+  "fonts_by_char_count": {
+    "Calibri": 818,
+    "Arial": 89
+  },
+  "direct_run_formatting_runs": 542,
+  "direct_paragraph_formatting_paragraphs": 1351,
+  "heading_like_paragraphs_not_heading_style": [],
+  "examples": {
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 1,
+        "text": "SERVICIO NACIONAL DE ADIESTRAMIENTO EN TRABAJO INDUSTRIAL",
+        "style": "Title"
+      },
+      {
+        "para_index": 24,
+        "text": "INFORME",
+        "style": "Heading 5"
+      },
+      {
+        "para_index": 25,
+        "text": "DE FORMACI\u00d3N PR\u00c1CTICA EN EMPRESA",
+        "style": "Heading 5"
+      },
+      {
+        "para_index": 41,
+        "text": "      ",
+        "style": "Normal"
+      },
+      {
+        "para_index": 57,
+        "text": "ID: \t________ BLOQUE: ___________________________________",
+        "style": "Normal"
+      }
+    ],
+    "direct_run_formatting": [
+      {
+        "para_index": 1,
+        "run_text": "SERVICIO NACIONAL DE ADIESTRAMIENTO EN TRABAJO INDUSTRIAL",
+        "style": "Title"
+      },
+      {
+        "para_index": 24,
+        "run_text": "INFORME",
+        "style": "Heading 5"
+      },
+      {
+        "para_index": 25,
+        "run_text": "DE ",
+        "style": "Heading 5"
+      },
+      {
+        "para_index": 25,
+        "run_text": "FORMACI\u00d3N ",
+        "style": "Heading 5"
+      },
+      {
+        "para_index": 25,
+        "run_text": "PR\u00c1CTICA",
+        "style": "Heading 5"
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}
