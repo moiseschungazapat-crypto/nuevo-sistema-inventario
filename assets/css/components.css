@@ -12,6 +12,8 @@ button,a,input,select,textarea{outline-offset:3px}button:focus-visible,a:focus-v
 .panel{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin-bottom:20px;box-shadow:0 2px 5px #0f172a04}.panel h2{font-size:16px;color:#0f2338;margin-bottom:12px}
 .button{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid #cbd5e1;background:white;border-radius:7px;padding:9px 13px;text-decoration:none;color:#334155;font-weight:600;cursor:pointer;white-space:nowrap;font-size:13px}
 .button:hover{background:#f1f5f9}.button.primary{background:#0f2338;color:white;border-color:#0f2338}.button.primary:hover{background:#21425f}.button.small{padding:5px 10px;font-size:12px}.button:disabled{opacity:.45;cursor:not-allowed}
+.catalog-tabs{display:flex;gap:0;margin-bottom:20px;border-bottom:1px solid #e2e8f0}.catalog-tab{border-radius:8px 8px 0 0;border-bottom:3px solid transparent;margin-bottom:-1px;min-width:130px}.catalog-tab.primary{background:#fff;color:#0f2338;border-color:#2563eb}.catalog-tab:not(.primary):hover{background:#f8fafc}
+.catalog-view-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:2px 0 18px}.catalog-view-header h2{margin:0}.catalog-view-header .muted{margin:4px 0 0}
 .toolbar{display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:18px}.toolbar label,.field{display:flex;flex-direction:column;gap:6px;font-size:12px;font-weight:600;color:#475569}
 .search-label{flex:1;min-width:200px}.toolbar input,.toolbar select{min-width:140px}
 input,select,textarea{border:1px solid #cbd5e1;border-radius:7px;padding:10px;background:white;color:#1e293b;width:100%;min-height:40px}
@@ -35,7 +37,7 @@ dialog{border:0;border-radius:14px;box-shadow:0 20px 80px #0f172a40;width:min(10
 .form-error:not(:empty){padding:12px;margin-top:16px;background:#fff1f2;border-radius:7px}
 .notice{position:fixed;bottom:24px;right:24px;z-index:1000;max-width:min(460px,calc(100% - 32px));padding:15px 20px;background:#0f2338;color:white;border-radius:10px;box-shadow:0 6px 25px #0f172a30}.notice.error{background:#991b1b}
 @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.page-heading{align-items:start;flex-direction:column}.account{gap:6px}.overview-grid{grid-template-columns:1fr}}
-@media(max-width:768px){.content-body{padding:18px 12px}.navbar-title{font-size:11px}.top-navbar{padding:0 12px}.account #user-display-name{display:none}.sync-state{font-size:10px}.panel{padding:14px}.page-heading h1{font-size:23px}.toolbar label{flex:1}.form-grid{grid-template-columns:1fr}.pagination{align-items:start;flex-direction:column}.kpi-card{padding:14px}.kpi-value{font-size:24px}.data-table td{padding:10px}.app-footer{padding-left:12px}.actions{width:100%}.actions .button{flex:1}}
+@media(max-width:768px){.content-body{padding:18px 12px}.navbar-title{font-size:11px}.top-navbar{padding:0 12px}.account #user-display-name{display:none}.sync-state{font-size:10px}.panel{padding:14px}.page-heading h1{font-size:23px}.toolbar label{flex:1}.form-grid{grid-template-columns:1fr}.pagination{align-items:start;flex-direction:column}.kpi-card{padding:14px}.kpi-value{font-size:24px}.data-table td{padding:10px}.app-footer{padding-left:12px}.actions{width:100%}.actions .button{flex:1}.catalog-tabs{overflow:auto}.catalog-tab{min-width:0;flex:1}.catalog-view-header{align-items:flex-start;flex-direction:column}}
 
 .sidebar-brand{position:relative}.sidebar-toggle{display:block}
 @media(min-width:769px){.sidebar.collapsed .sidebar-toggle{margin:0 auto}.sidebar.collapsed .brand-name{display:none}.top-navbar .btn-toggle{display:none}}
@@ -65,6 +67,7 @@ html[data-theme="dark"] .button,html[data-theme="dark"] .theme-toggle{background
 html[data-theme="dark"] .button:hover,html[data-theme="dark"] .theme-toggle:hover{background:#22344b}
 html[data-theme="dark"] .button.primary{background:#2f6f9f;border-color:#3c82b6;color:#fff}
 html[data-theme="dark"] .button.primary:hover{background:#3a7eaf}
+html[data-theme="dark"] .catalog-tabs{border-color:#26384e}html[data-theme="dark"] .catalog-tab.primary{background:#111d2e;color:#edf5ff;border-color:#5b9dcc}
 html[data-theme="dark"] .data-table th{background:#162438}
 html[data-theme="dark"] .data-table tbody tr:hover{background:#17263a}
 html[data-theme="dark"] dialog{background:#101b2b;color:#dbe5f0;border:1px solid #30445d}

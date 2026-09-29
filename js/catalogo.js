@@ -3,5 +3,5 @@ import { mountShell } from './components/shell.js';
 import { startPage } from './app.js';
 mountShell();
 document.addEventListener('DOMContentLoaded', async () => {
- if (await sessionReady) await startPage('catalogo',{view:'productos'});
+ if (await sessionReady) await startPage('catalogo');
 });
