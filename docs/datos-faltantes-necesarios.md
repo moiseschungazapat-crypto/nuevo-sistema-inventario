@@ -74,6 +74,11 @@ No se deben insertar estos productos hasta que la empresa asigne el SKU y confir
 
 ## 3. Proveedores que requieren conciliación
 
+Los proveedores de Facturas 4 con razón social y RUC legibles quedaron preparados
+en `supabase/migrations/202609290009_catalogo_facturas4_proveedores.sql`.
+La migración es idempotente: no duplica un proveedor cuando el RUC o el nombre ya
+existe. No agrega productos porque todavía falta el SKU interno y la unidad base.
+
 El catálogo debe conservar solo proveedores que abastecen existencias. Se debe confirmar el documento y la razón social de:
 
 - Negociaciones e Inversiones Aileen S.A.
