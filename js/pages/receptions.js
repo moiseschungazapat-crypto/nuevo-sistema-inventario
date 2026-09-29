@@ -1,12 +1,13 @@
 import { allRows, rpc } from '../services/data.js';
 import { supabase } from '../supabase.js';
 import { heading, e, table, field, options, openEditor, notice, loadError } from '../components/ui.js';
+import { operationalSite, operationalSiteError, operationalSiteLabel } from '../utils/single-site.js';
 
 const nullableNumber = value => value === '' || value == null ? null : Number(value);
 const productLabel = product => `${product.codigo || 'Sin código'} · ${product.nombre}`;
 
 export async function receptionsPage(root, access) {
- let rows = [], providers = [], products = [], sites = [], lots = [];
+ let rows = [], providers = [], products = [], sites = [], lots = [], mainSite = null;
  const canWrite = access.rol !== 'consulta';
  root.innerHTML = heading('Recepciones','Registra compras, diferencias entre factura y entrega, datos de pago y sus comprobantes.',canWrite?'<button id="new-reception" class="button primary">+ Nueva recepción</button>':'')+'<section class="panel"><div class="toolbar"><button id="refresh" class="button">Actualizar</button></div><div id="results"></div></section>';
 
@@ -40,8 +41,11 @@ export async function receptionsPage(root, access) {
  }
 
  async function refresh(){
-  try{
+ try{
    [providers,products,sites,lots]=await Promise.all([allRows('proveedores'),allRows('productos'),allRows('sedes'),allRows('lotes')]);
+   mainSite=operationalSite(sites);
+   const siteError=operationalSiteError(sites);
+   if(siteError) throw new Error(siteError);
    rows=await rpc('app_listar_recepciones');render();loadError(null);
   }catch(error){loadError(error);}
  }
@@ -75,6 +79,7 @@ export async function receptionsPage(root, access) {
  }
 
  function openReception(){
+  if(!mainSite){notice(operationalSiteError(sites)||'Configura la sede de operación antes de registrar una recepción.',true);return;}
   openEditor({
    title:'Nueva recepción',
    fields:
@@ -83,7 +88,6 @@ export async function receptionsPage(root, access) {
     field('serie','Serie',{required:true,maxLength:10})+field('numero','Número',{required:true,maxLength:30})+
     field('fecha_emision','Fecha de emisión',{type:'date',required:true,value:new Date().toISOString().slice(0,10)})+
     field('fecha_recepcion','Fecha de recepción',{type:'date',required:true,value:new Date().toISOString().slice(0,10)})+
-    field('sede_id','Sede de destino',{required:true,choices:options(sites.filter(s=>s.estado))})+
     field('responsable','Responsable de recepción',{required:true,maxLength:150})+
     field('moneda','Moneda',{choices:'<option value="PEN">PEN (S/)</option><option value="USD">USD ($)</option><option value="EUR">EUR (€)</option>'})+
     field('forma_pago','Forma de pago',{choices:'<option value="">No indicado</option><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option><option>Crédito</option><option>Yape / Plin</option><option>Otro</option>'})+
@@ -94,6 +98,7 @@ export async function receptionsPage(root, access) {
     field('igv','IGV',{type:'number',min:0,step:'0.01'})+field('total','Total del comprobante',{type:'number',min:0,step:'0.01'})+
     field('estado_pago','Estado de pago',{choices:'<option value="pendiente">Pendiente</option><option value="parcial">Parcial</option><option value="pagado">Pagado</option>'})+
     field('detraccion_porcentaje','Detracción %',{type:'number',min:0,step:'0.01'})+field('detraccion_monto','Detracción monto',{type:'number',min:0,step:'0.01'})+
+    `<p class="muted full-width">Sede de recepción: ${e(operationalSiteLabel(mainSite))}</p>`+
     '<p class="muted full-width">Agrega los productos de la misma factura con el botón +. Servicios, equipos y gastos se guardan en el historial sin aumentar existencias.</p><div id="reception-lines" class="full-width">'+line(0,true)+'</div>'+
     '<button type="button" id="add-reception-line" class="button full-width">+ Agregar producto</button>'+field('observaciones','Observaciones',{type:'textarea',maxLength:1000})+
     '<label class="field full-width">Fotos o PDF de la factura<input name="archivos" type="file" accept="image/jpeg,image/png,application/pdf" multiple><small>Máximo 10 MB por imagen y 15 MB por PDF.</small></label>',
@@ -115,7 +120,7 @@ export async function receptionsPage(root, access) {
      detalles.push({producto_id:p,lote_id:product.controla_inventario===false?null:(values['lote_'+i]||null),cantidad_facturada:f,cantidad_recibida:r,unidad:(values['unidad_'+i]||product.unidad_medida||'unidad').trim(),precio_unitario:nullableNumber(values['precio_'+i])});
     }
     if(!detalles.length)throw new Error('Agrega al menos un producto.');
-    const rid=await rpc('app_registrar_recepcion',{p_recepcion:{proveedor_id:values.proveedor_id,tipo_comprobante:values.tipo_comprobante,serie:values.serie.trim(),numero:values.numero.trim(),fecha_emision:values.fecha_emision,fecha_recepcion:values.fecha_recepcion,sede_id:values.sede_id,responsable:values.responsable.trim(),moneda:values.moneda,forma_pago:values.forma_pago||null,condicion_pago:values.condicion_pago?.trim()||null,fecha_vencimiento_pago:values.fecha_vencimiento_pago||null,guia_remision:values.guia_remision?.trim()||null,orden_compra:values.orden_compra?.trim()||null,subtotal:nullableNumber(values.subtotal),descuento:nullableNumber(values.descuento),igv:nullableNumber(values.igv),total:nullableNumber(values.total),estado_pago:values.estado_pago,detraccion_porcentaje:nullableNumber(values.detraccion_porcentaje),detraccion_monto:nullableNumber(values.detraccion_monto),observaciones:values.observaciones||'',detalles}});
+    const rid=await rpc('app_registrar_recepcion',{p_recepcion:{proveedor_id:values.proveedor_id,tipo_comprobante:values.tipo_comprobante,serie:values.serie.trim(),numero:values.numero.trim(),fecha_emision:values.fecha_emision,fecha_recepcion:values.fecha_recepcion,sede_id:String(mainSite.id),responsable:values.responsable.trim(),moneda:values.moneda,forma_pago:values.forma_pago||null,condicion_pago:values.condicion_pago?.trim()||null,fecha_vencimiento_pago:values.fecha_vencimiento_pago||null,guia_remision:values.guia_remision?.trim()||null,orden_compra:values.orden_compra?.trim()||null,subtotal:nullableNumber(values.subtotal),descuento:nullableNumber(values.descuento),igv:nullableNumber(values.igv),total:nullableNumber(values.total),estado_pago:values.estado_pago,detraccion_porcentaje:nullableNumber(values.detraccion_porcentaje),detraccion_monto:nullableNumber(values.detraccion_monto),observaciones:values.observaciones||'',detalles}});
     const files=values.__form.elements.archivos.files;
     for(const file of files){const max=file.type==='application/pdf'?15:10;if(file.size>max*1024*1024)throw new Error('Un archivo supera el límite permitido.');const path=`${rid}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const upload=await supabase.storage.from('documentos-recepcion').upload(path,file,{upsert:false,contentType:file.type});if(upload.error)throw upload.error;const saved=await supabase.from('recepcion_archivos').insert({recepcion_id:rid,ruta:path,nombre:file.name,tipo:file.type,tamano:file.size});if(saved.error)throw saved.error;}
     notice('Recepción guardada; las existencias solo aumentaron para productos de stock.');await refresh();

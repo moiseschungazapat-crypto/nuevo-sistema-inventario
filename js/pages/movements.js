@@ -2,6 +2,7 @@ import { allRows, rpc } from '../services/data.js';
 import { movementPage } from '../services/movements.js';
 import { heading, e, badge, table, pager, field, options, openEditor, notice, loadError } from '../components/ui.js';
 import { quantity, validateMovement, csvContent } from '../utils/domain.js';
+import { operationalSite, operationalSiteError, operationalSiteLabel } from '../utils/single-site.js';
 const labels={entrada:'Entrada',salida:'Salida',traslado:'Traslado',ajuste_positivo:'Ajuste (+)',ajuste_negativo:'Ajuste (−)'};
 export const movementHeaders=['Fecha (Lima)','Tipo','Producto','Lote','Sede','Destino','Cantidad','Unidad','Responsable','Documento','Motivo'];
 export function movementValues(row){return [new Date(row.fecha).toLocaleString('es-PE',{timeZone:'America/Lima'}),labels[row.tipo]||row.tipo,row.producto,row.lote,row.sede,row.destino||'—',row.cantidad,row.unidad_medida,row.responsable,row.documento||'',row.motivo];}
@@ -10,13 +11,13 @@ export function downloadCsv(filename,headers,rows){
  const link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 export async function movementsPage(root,access,report=false){
- let products=[],sites=[],lots=[],stock=[],page=0,request=0;
+ let products=[],sites=[],lots=[],stock=[],mainSite=null,page=0,request=0;
  const canWrite=access.rol!=='consulta';
  const pendingKey='liguria-movement-'+access.user_id;
  function readPending(){try{return JSON.parse(localStorage.getItem(pendingKey)||'null');}catch{return null;}}
  root.innerHTML=heading(report?'Reportes':'Movimientos',report?'Consulta y exporta existencias o movimientos. Fechas expresadas en hora de Lima.':'Historial auditable de entradas, salidas, traslados y ajustes por lote.',
  report?'<button class="button" id="export-stock">Exportar existencias</button><button class="button primary" id="export-movements">Exportar movimientos</button>':(canWrite?'<button class="button primary" id="new-movement">+ Registrar movimiento</button>':''))+
- '<section class="panel"><div class="toolbar filters"><label>Producto<select id="product"></select></label><label>Sede<select id="site"></select></label><label>Tipo<select id="type"><option value="">Todos</option>'+Object.entries(labels).map(([key,label])=>'<option value="'+key+'">'+label+'</option>').join('')+'</select></label><label>Desde<input type="date" id="from"></label><label>Hasta<input type="date" id="to"></label><button id="refresh" class="button">Actualizar</button></div><div id="results"></div><div id="pager" class="pagination"></div></section>';
+ '<section class="panel"><div class="toolbar filters"><label>Producto<select id="product"></select></label><label>Sede<select id="site"></select></label><label>Tipo<select id="type"><option value="">Todos</option>'+Object.entries(labels).filter(([key])=>key!=='traslado').map(([key,label])=>'<option value="'+key+'">'+label+'</option>').join('')+'</select></label><label>Desde<input type="date" id="from"></label><label>Hasta<input type="date" id="to"></label><button id="refresh" class="button">Actualizar</button></div><div id="results"></div><div id="pager" class="pagination"></div></section>';
  function filters(){
   const values={producto:root.querySelector('#product').value,sede:root.querySelector('#site').value,tipo:root.querySelector('#type').value,desde:root.querySelector('#from').value,hasta:root.querySelector('#to').value};
   if(values.desde&&values.hasta&&values.desde>values.hasta) throw new Error('La fecha inicial debe ser anterior o igual a la fecha final.');
@@ -35,6 +36,9 @@ export async function movementsPage(root,access,report=false){
  }
  async function loadLookups(){
   [products,sites,lots,stock]=await Promise.all([allRows('productos'),allRows('sedes'),allRows('lotes'),allRows('app_stock')]);
+  mainSite=operationalSite(sites);
+  const siteError=operationalSiteError(sites);
+  if(siteError) throw new Error(siteError);
   products=products.filter(product=>product.controla_inventario!==false);
   for(const [id,rows] of [['product',products],['site',sites]]){
    const node=root.querySelector('#'+id),current=node.value;node.innerHTML=options(rows,current,'Todos');
@@ -45,37 +49,45 @@ export async function movementsPage(root,access,report=false){
   try{await loadLookups();}catch(error){notice('No se pudieron cargar productos, sedes y lotes. Actualiza e inténtalo nuevamente.',true);return;}
   let pending=readPending();
   const data=pending?.values||{};
-  const allowed=Object.entries(labels).filter(([key])=>access.rol==='administrador'||!key.startsWith('ajuste'));
+  const allowed=Object.entries(labels).filter(([key])=>key!=='traslado' && (access.rol==='administrador'||!key.startsWith('ajuste')));
+  const movementType=data.tipo==='traslado'?'entrada':data.tipo;
   openEditor({title:pending?'Reintentar movimiento pendiente':'Registrar movimiento',fields:
-   field('tipo','Tipo',{choices:allowed.map(([key,label])=>`<option value="${key}" ${key===data.tipo?'selected':''}>${label}</option>`).join('')})+
+   field('tipo','Tipo',{choices:allowed.map(([key,label])=>`<option value="${key}" ${key===movementType?'selected':''}>${label}</option>`).join('')})+
    field('producto_id','Producto',{required:true,choices:options(products.filter(p=>(p.estado||String(p.id)===data.producto_id)&&p.controla_inventario!==false),data.producto_id)})+
    field('lote_id','Lote',{required:true,choices:'',help:'Para crear un lote, utiliza Inventario → Nuevo lote.'})+
-   field('sede_id','Sede (origen en traslados)',{required:true,choices:options(sites.filter(s=>s.estado||String(s.id)===data.sede_id),data.sede_id)})+
-   field('destino_id','Sede de destino',{choices:options(sites.filter(s=>s.estado),data.destino_id)})+
    field('cantidad','Cantidad en la unidad base del producto',{type:'number',required:true,min:0.001,step:'0.001',value:data.cantidad||''})+
    field('documento','Documento / referencia',{value:data.documento||'',maxLength:120})+
    field('motivo','Motivo',{type:'textarea',required:true,value:data.motivo||'',maxLength:1000})+
+   `<p class="muted full-width">Sede de operación: ${e(operationalSiteLabel(mainSite))}</p>`+
    '<p id="available" class="muted full-width"></p>',
    setup(form){
-    const product=form.elements.producto_id,lot=form.elements.lote_id,type=form.elements.tipo,site=form.elements.sede_id,destination=form.elements.destino_id;
+    const product=form.elements.producto_id,lot=form.elements.lote_id,type=form.elements.tipo,siteId=String(mainSite.id);
     function fillLots(){
      const selected=lot.value||data.lote_id;
      lot.innerHTML=options(lots.filter(l=>String(l.producto_id)===product.value).sort((a,b)=>a.vencimiento.localeCompare(b.vencimiento)),selected,'Seleccionar lote',l=>l.codigo+' · Vence '+l.vencimiento);info();
     }
     function info(){
-     const row=stock.find(r=>String(r.producto_id)===product.value&&String(r.lote_id)===lot.value&&String(r.sede_id)===site.value);
+     const row=stock.find(r=>String(r.producto_id)===product.value&&String(r.lote_id)===lot.value&&String(r.sede_id)===siteId);
      const unit=products.find(p=>String(p.id)===product.value)?.unidad_medida||'';
      form.querySelector('#available').textContent='Disponible en esta sede y lote: '+quantity(row?.cantidad||0)+' '+unit+'. El saldo se valida nuevamente al guardar.';
-     destination.closest('label').hidden=type.value!=='traslado';destination.required=type.value==='traslado';
     }
-    product.onchange=fillLots;lot.onchange=info;site.onchange=info;type.onchange=info;fillLots();
+    product.onchange=fillLots;lot.onchange=info;type.onchange=info;fillLots();
     if(pending){for(const control of form.querySelectorAll('input,select,textarea')) control.disabled=true;}
    },
    save:async values=>{
+    values.sede_id=String(mainSite.id);
+    values.destino_id=null;
     if(!pending){
      const validated=validateMovement(values);
      pending={key:crypto.randomUUID(),values:validated};
      // Conservar la misma operación en reintentos y recargas. Si storage falla, no enviar.
+     localStorage.setItem(pendingKey,JSON.stringify(pending));
+    }else{
+     // Una operación pendiente creada antes del modo de sede única no puede
+     // conservar un traslado ni una sede elegida manualmente.
+     pending.values.sede_id=String(mainSite.id);
+     pending.values.destino_id=null;
+     if(pending.values.tipo==='traslado') pending.values.tipo='entrada';
      localStorage.setItem(pendingKey,JSON.stringify(pending));
     }
     const v=pending.values;
