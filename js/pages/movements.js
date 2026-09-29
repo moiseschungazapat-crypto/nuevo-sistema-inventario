@@ -15,9 +15,9 @@ export async function movementsPage(root,access,report=false){
  const canWrite=access.rol!=='consulta';
  const pendingKey='liguria-movement-'+access.user_id;
  function readPending(){try{return JSON.parse(localStorage.getItem(pendingKey)||'null');}catch{return null;}}
- root.innerHTML=heading(report?'Reportes':'Movimientos',report?'Consulta y exporta existencias o movimientos. Fechas expresadas en hora de Lima.':'Historial auditable de entradas, salidas, traslados y ajustes por lote.',
+ root.innerHTML=heading(report?'Reportes':'Movimientos',report?'Consulta y exporta el Inventario de La Liguria y sus movimientos. Fechas expresadas en hora de Lima.':'Historial auditable de entradas, salidas y ajustes del Inventario de La Liguria.',
  report?'<button class="button" id="export-stock">Exportar existencias</button><button class="button primary" id="export-movements">Exportar movimientos</button>':(canWrite?'<button class="button primary" id="new-movement">+ Registrar movimiento</button>':''))+
- '<section class="panel"><div class="toolbar filters"><label>Producto<select id="product"></select></label><label>Sede<select id="site"></select></label><label>Tipo<select id="type"><option value="">Todos</option>'+Object.entries(labels).filter(([key])=>key!=='traslado').map(([key,label])=>'<option value="'+key+'">'+label+'</option>').join('')+'</select></label><label>Desde<input type="date" id="from"></label><label>Hasta<input type="date" id="to"></label><button id="refresh" class="button">Actualizar</button></div><div id="results"></div><div id="pager" class="pagination"></div></section>';
+ '<section class="panel"><div class="toolbar filters"><label>Producto<select id="product"></select></label><label>Sede operativa<select id="site"></select></label><label>Tipo<select id="type"><option value="">Todos</option>'+Object.entries(labels).filter(([key])=>key!=='traslado').map(([key,label])=>'<option value="'+key+'">'+label+'</option>').join('')+'</select></label><label>Desde<input type="date" id="from"></label><label>Hasta<input type="date" id="to"></label><button id="refresh" class="button">Actualizar</button></div><div id="results"></div><div id="pager" class="pagination"></div></section>';
  function filters(){
   const values={producto:root.querySelector('#product').value,sede:root.querySelector('#site').value,tipo:root.querySelector('#type').value,desde:root.querySelector('#from').value,hasta:root.querySelector('#to').value};
   if(values.desde&&values.hasta&&values.desde>values.hasta) throw new Error('La fecha inicial debe ser anterior o igual a la fecha final.');
@@ -36,13 +36,16 @@ export async function movementsPage(root,access,report=false){
  }
  async function loadLookups(){
   [products,sites,lots,stock]=await Promise.all([allRows('productos'),allRows('sedes'),allRows('lotes'),allRows('app_stock')]);
-  mainSite=operationalSite(sites);
-  const siteError=operationalSiteError(sites);
-  if(siteError) throw new Error(siteError);
-  products=products.filter(product=>product.controla_inventario!==false);
-  for(const [id,rows] of [['product',products],['site',sites]]){
-   const node=root.querySelector('#'+id),current=node.value;node.innerHTML=options(rows,current,'Todos');
-  }
+   mainSite=operationalSite(sites);
+   const siteError=operationalSiteError(sites);
+   if(siteError) throw new Error(siteError);
+  sites=[mainSite];
+   products=products.filter(product=>product.controla_inventario!==false);
+   for(const [id,rows] of [['product',products],['site',sites]]){
+   const node=root.querySelector('#'+id),current=id==='site'?String(mainSite.id):node.value;
+   node.innerHTML=options(rows,current,id==='site'?operationalSiteLabel(mainSite):'Todos',id==='site'?operationalSiteLabel:undefined);
+   if(id==='site'){node.value=String(mainSite.id);node.disabled=true;}
+   }
  }
  async function refreshAll(){try{await loadLookups();await refresh();}catch(error){loadError(error);}}
  async function openMovement(){

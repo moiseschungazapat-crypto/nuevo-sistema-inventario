@@ -19,7 +19,7 @@ export function operationalSite(sites) {
 }
 
 export function operationalSiteLabel(site = {}) {
-  return `${site.nombre || OPERATIONAL_SITE_NAME} · ${site.direccion || OPERATIONAL_SITE_ADDRESS}`;
+  return `${site.nombre || OPERATIONAL_SITE_NAME} — ${site.direccion || OPERATIONAL_SITE_ADDRESS}`;
 }
 
 export function operationalSiteError(sites) {

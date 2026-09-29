@@ -9,10 +9,10 @@ const productLabel = product => `${product.codigo || 'Sin código'} · ${product
 export async function receptionsPage(root, access) {
  let rows = [], providers = [], products = [], sites = [], lots = [], mainSite = null;
  const canWrite = access.rol !== 'consulta';
- root.innerHTML = heading('Recepciones','Registra compras, diferencias entre factura y entrega, datos de pago y sus comprobantes.',canWrite?'<button id="new-reception" class="button primary">+ Nueva recepción</button>':'')+'<section class="panel"><div class="toolbar"><button id="refresh" class="button">Actualizar</button></div><div id="results"></div></section>';
+ root.innerHTML = heading('Recepciones','Registra compras para el Inventario de La Liguria, diferencias entre factura y entrega, datos de pago y sus comprobantes.',canWrite?'<button id="new-reception" class="button primary">+ Nueva recepción</button>':'')+'<section class="panel"><div class="toolbar"><button id="refresh" class="button">Actualizar</button></div><div id="results"></div></section>';
 
  function render() {
-  root.querySelector('#results').innerHTML = table(['Fecha','Proveedor','Comprobante','Sede','Productos','Facturado','Recibido','Faltante','Total','Estado de pago','Adjuntos'], rows.map(r => [
+  root.querySelector('#results').innerHTML = table(['Fecha','Proveedor','Comprobante','Sede de recepción','Productos','Facturado','Recibido','Faltante','Total','Estado de pago','Adjuntos'], rows.map(r => [
    e(r.fecha_emision),e(r.proveedor),e((r.tipo_comprobante||'Factura')+' '+r.serie+'-'+r.numero),e(r.sede),e(r.productos),e(r.facturado),e(r.recibido),e(r.faltante),r.total == null ? '—' : e(`${r.moneda || 'PEN'} ${Number(r.total).toFixed(2)}`),e(r.estado_pago || 'pendiente'),r.archivos?`<button class="button" data-files="${e(r.id)}">Ver (${e(r.archivos)})</button>`:'—'
   ]));
   root.querySelectorAll('[data-files]').forEach(button => button.onclick = () => showFiles(button.dataset.files));

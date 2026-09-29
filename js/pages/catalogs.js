@@ -4,7 +4,7 @@ import { quantity } from '../utils/domain.js';
 export const catalogConfig = {
  categorias: {title:'Categorías', singular:'categoría', description:'Organiza los productos y conserva su clasificación.', fields:[['nombre','Nombre'],['descripcion','Descripción','textarea']], columns:['Nombre','Descripción','Estado']},
  proveedores: {title:'Proveedores', singular:'proveedor', description:'Directorio de empresas y contactos de abastecimiento.', fields:[['nombre','Razón social / nombre'],['documento','RUC / documento'],['contacto','Persona de contacto'],['telefono','Teléfono','tel'],['email','Correo','email'],['direccion','Dirección']], columns:['Proveedor','Documento','Contacto','Teléfono','Correo','Estado']},
- sedes: {title:'Sedes', singular:'sede', description:'Locales y almacenes que comparten este inventario.', fields:[['nombre','Nombre'],['direccion','Dirección'],['responsable','Responsable']], columns:['Sede','Dirección','Responsable','Estado']},
+ sedes: {title:'Sedes', singular:'sede', description:'Sede operativa de La Liguria y futuras sucursales.', fields:[['nombre','Nombre'],['direccion','Dirección'],['responsable','Responsable']], columns:['Sede','Dirección','Responsable','Estado']},
  productos: {title:'Productos', singular:'producto', description:'Catálogo compartido. Las cantidades se registran mediante movimientos.', fields:[['codigo','Código / SKU'],['nombre','Nombre'],['descripcion','Descripción','textarea'],['marca','Marca'],['presentacion','Presentación'],['codigo_barras','Código de barras'],['precio','Precio de referencia (S/)','number']], columns:['Código','Producto','Categoría','Unidad','Tipo','Control de stock','Precio de referencia','Estado']},
 };
 export async function catalogPage(root, section, access) {

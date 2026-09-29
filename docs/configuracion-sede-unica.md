@@ -24,6 +24,10 @@ La empresa todavía debe completar el responsable en la ficha de la sede.
 
 - Movimientos nuevos: el origen se fija automáticamente en Av. Arica 281.
 - Recepciones nuevas: la sede se fija automáticamente en Av. Arica 281.
-- Traslado y sede de destino: no aparecen en los formularios.
+- Traslados y destinos: no aparecen en los formularios.
+- Inventario, movimientos y recepciones solo muestran la sede operativa; las demás
+  sedes no se ofrecen como opciones de operación.
+- El catálogo administrativo de Sedes se conserva para registrar sucursales
+  futuras sin mezclar sus existencias con la operación actual.
 - Si no existe una sede activa con esa dirección, el sistema pide configurarla y no
   guarda operaciones en una sede desconocida.

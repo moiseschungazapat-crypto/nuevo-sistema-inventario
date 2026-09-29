@@ -17,4 +17,16 @@ where not exists (
   where lower(btrim(coalesce(direccion,'')))=lower('Av. Arica 281')
 );
 
+-- Si la dirección ya existía con otro nombre o estaba inactiva, normalizar
+-- únicamente esa sede operativa sin tocar las demás sucursales.
+update public.sedes
+set nombre='La Liguria S.A.', estado=true
+where id=(
+  select id
+  from public.sedes
+  where lower(btrim(coalesce(direccion,'')))=lower('Av. Arica 281')
+  order by id
+  limit 1
+);
+
 commit;
