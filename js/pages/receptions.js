@@ -5,6 +5,8 @@ import { operationalSite, operationalSiteError, operationalSiteLabel } from '../
 
 const nullableNumber = value => value === '' || value == null ? null : Number(value);
 const productLabel = product => `${product.codigo || 'Sin código'} · ${product.nombre}`;
+const limaToday = () => new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const limaDateTime = value => value ? new Intl.DateTimeFormat('es-PE',{timeZone:'America/Lima',dateStyle:'short',timeStyle:'medium'}).format(new Date(value)) : '—';
 
 export async function receptionsPage(root, access) {
  let rows = [], providers = [], products = [], sites = [], lots = [], mainSite = null;
@@ -12,8 +14,8 @@ export async function receptionsPage(root, access) {
  root.innerHTML = heading('Recepciones','Registra compras para el Inventario de La Liguria, diferencias entre factura y entrega, datos de pago y sus comprobantes.',canWrite?'<button id="new-reception" class="button primary">+ Nueva recepción</button>':'')+'<section class="panel"><div class="toolbar"><button id="refresh" class="button">Actualizar</button></div><div id="results"></div></section>';
 
  function render() {
-  root.querySelector('#results').innerHTML = table(['Fecha','Proveedor','Comprobante','Sede de recepción','Productos','Facturado','Recibido','Faltante','Total','Estado de pago','Adjuntos'], rows.map(r => [
-   e(r.fecha_emision),e(r.proveedor),e((r.tipo_comprobante||'Factura')+' '+r.serie+'-'+r.numero),e(r.sede),e(r.productos),e(r.facturado),e(r.recibido),e(r.faltante),r.total == null ? '—' : e(`${r.moneda || 'PEN'} ${Number(r.total).toFixed(2)}`),e(r.estado_pago || 'pendiente'),r.archivos?`<button class="button" data-files="${e(r.id)}">Ver (${e(r.archivos)})</button>`:'—'
+  root.querySelector('#results').innerHTML = table(['Emisión','Recepción','Registrado (Lima)','Proveedor','Comprobante','Sede de recepción','Productos','Facturado','Recibido','Faltante','Total','Estado de pago','Adjuntos'], rows.map(r => [
+   e(r.fecha_emision),e(r.fecha_recepcion || r.fecha_emision),e(limaDateTime(r.created_at)),e(r.proveedor),e((r.tipo_comprobante||'Factura')+' '+r.serie+'-'+r.numero),e(r.sede),e(r.productos),e(r.facturado),e(r.recibido),e(r.faltante),r.total == null ? '—' : e(`${r.moneda || 'PEN'} ${Number(r.total).toFixed(2)}`),e(r.estado_pago || 'pendiente'),r.archivos?`<button class="button" data-files="${e(r.id)}">Ver (${e(r.archivos)})</button>`:'—'
   ]));
   root.querySelectorAll('[data-files]').forEach(button => button.onclick = () => showFiles(button.dataset.files));
  }
@@ -57,7 +59,7 @@ export async function receptionsPage(root, access) {
    ${field('facturada_'+i,'Facturada',{type:'number',required,min:required?0.001:0,step:'0.001'})}
    ${field('recibida_'+i,'Recibida',{type:'number',required,min:0,step:'0.001'})}
    ${field('unidad_'+i,'Unidad',{required,value:'unidad'})}
-   ${field('precio_'+i,'Precio unitario',{type:'number',min:0,step:'0.0001'})}
+   ${field('precio_'+i,'Precio unitario (opcional)',{type:'number',min:0,step:'0.0001'})}
    <button type="button" class="button line-remove" data-remove-line ${required?'hidden':''}>Quitar</button>
   </div>`;
  }
@@ -86,22 +88,25 @@ export async function receptionsPage(root, access) {
     field('proveedor_id','Proveedor',{required:true,choices:options(providers.filter(p=>p.estado))})+
     field('tipo_comprobante','Comprobante',{choices:'<option>Factura</option><option>Boleta</option><option>Guía</option><option>Nota de crédito</option><option>Otro</option>'})+
     field('serie','Serie',{required:true,maxLength:10})+field('numero','Número',{required:true,maxLength:30})+
-    field('fecha_emision','Fecha de emisión',{type:'date',required:true,value:new Date().toISOString().slice(0,10)})+
-    field('fecha_recepcion','Fecha de recepción',{type:'date',required:true,value:new Date().toISOString().slice(0,10)})+
-    field('responsable','Responsable de recepción',{required:true,maxLength:150})+
-    field('moneda','Moneda',{choices:'<option value="PEN">PEN (S/)</option><option value="USD">USD ($)</option><option value="EUR">EUR (€)</option>'})+
-    field('forma_pago','Forma de pago',{choices:'<option value="">No indicado</option><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option><option>Crédito</option><option>Yape / Plin</option><option>Otro</option>'})+
-    field('condicion_pago','Condición de pago',{value:'',maxLength:120,help:'Ejemplo: contado, crédito 45 días.'})+
-    field('fecha_vencimiento_pago','Vencimiento de pago',{type:'date'})+
-    field('guia_remision','Guía de remisión',{maxLength:60})+field('orden_compra','Orden de compra',{maxLength:60})+
-    field('subtotal','Subtotal',{type:'number',min:0,step:'0.01'})+field('descuento','Descuento',{type:'number',min:0,step:'0.01'})+
-    field('igv','IGV',{type:'number',min:0,step:'0.01'})+field('total','Total del comprobante',{type:'number',min:0,step:'0.01'})+
-    field('estado_pago','Estado de pago',{choices:'<option value="pendiente">Pendiente</option><option value="parcial">Parcial</option><option value="pagado">Pagado</option>'})+
-    field('detraccion_porcentaje','Detracción %',{type:'number',min:0,step:'0.01'})+field('detraccion_monto','Detracción monto',{type:'number',min:0,step:'0.01'})+
-    `<p class="muted full-width">Sede de recepción: ${e(operationalSiteLabel(mainSite))}</p>`+
-    '<p class="muted full-width">Agrega los productos de la misma factura con el botón +. Servicios, equipos y gastos se guardan en el historial sin aumentar existencias.</p><div id="reception-lines" class="full-width">'+line(0,true)+'</div>'+
-    '<button type="button" id="add-reception-line" class="button full-width">+ Agregar producto</button>'+field('observaciones','Observaciones',{type:'textarea',maxLength:1000})+
-    '<label class="field full-width">Fotos o PDF de la factura<input name="archivos" type="file" accept="image/jpeg,image/png,application/pdf" multiple><small>Máximo 10 MB por imagen y 15 MB por PDF.</small></label>',
+     field('fecha_emision','Fecha de emisión',{type:'date',required:true,value:limaToday()})+
+     field('fecha_recepcion','Fecha de recepción',{type:'date',required:true,value:limaToday()})+
+     field('responsable','Responsable de recepción',{required:true,maxLength:150,value:access.nombre||''})+
+     '<p class="muted full-width">La hora exacta del servidor se guardará automáticamente al confirmar la recepción.</p>'+
+     `<p class="muted full-width">Sede de recepción: ${e(operationalSiteLabel(mainSite))}</p>`+
+     '<details class="reception-optional full-width"><summary>Detalles comerciales opcionales</summary><div class="form-grid">'+
+      field('moneda','Moneda',{choices:'<option value="PEN">PEN (S/)</option><option value="USD">USD ($)</option><option value="EUR">EUR (€)</option>'})+
+      field('forma_pago','Forma de pago',{choices:'<option value="">No indicado</option><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option><option>Crédito</option><option>Yape / Plin</option><option>Otro</option>'})+
+      field('condicion_pago','Condición de pago',{value:'',maxLength:120,help:'Ejemplo: contado, crédito 45 días.'})+
+      field('fecha_vencimiento_pago','Vencimiento de pago',{type:'date'})+
+      field('guia_remision','Guía de remisión',{maxLength:60})+field('orden_compra','Orden de compra',{maxLength:60})+
+      field('subtotal','Subtotal',{type:'number',min:0,step:'0.01'})+field('descuento','Descuento',{type:'number',min:0,step:'0.01'})+
+      field('igv','IGV',{type:'number',min:0,step:'0.01'})+field('total','Total del comprobante',{type:'number',min:0,step:'0.01'})+
+      field('estado_pago','Estado de pago',{choices:'<option value="pendiente">Pendiente</option><option value="parcial">Parcial</option><option value="pagado">Pagado</option>'})+
+      field('detraccion_porcentaje','Detracción %',{type:'number',min:0,step:'0.01'})+field('detraccion_monto','Detracción monto',{type:'number',min:0,step:'0.01'})+
+      field('observaciones','Observaciones',{type:'textarea',maxLength:1000})+'</div></details>'+
+     '<p class="muted full-width">Agrega los productos de la misma factura con el botón +. La unidad se completa desde el catálogo y el lote solo es obligatorio cuando el producto lo requiere.</p><div id="reception-lines" class="full-width">'+line(0,true)+'</div>'+
+     '<button type="button" id="add-reception-line" class="button full-width">+ Agregar producto</button>'+
+     '<label class="field full-width">Factura o comprobante (recomendado)<input name="archivos" type="file" accept="image/jpeg,image/png,application/pdf" multiple><small>Puedes adjuntar varias imágenes o un PDF. Máximo 10 MB por imagen y 15 MB por PDF.</small></label>',
    setup:form=>{
     let next=1;const list=form.querySelector('#reception-lines');
     syncLine(list.querySelector('[data-reception-line]'));
