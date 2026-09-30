@@ -226,7 +226,14 @@ Deno.serve(async (request) => {
   if (!response.ok) {
     const detail = await response.text();
     console.error("OpenAI invoice analysis failed", response.status, detail.slice(0, 500));
-    return json({ error: "No se pudo analizar la factura. Revisa la configuración de inteligencia y vuelve a intentarlo." }, 502);
+    const message = response.status === 401 || response.status === 403
+      ? "OpenAI rechazó la clave configurada. Revisa OPENAI_API_KEY en los secretos de la Edge Function."
+      : response.status === 429
+        ? "OpenAI rechazó la solicitud por límite de uso o falta de crédito disponible. Revisa Usage y Billing de tu cuenta."
+        : response.status === 400
+          ? "OpenAI rechazó el formato de la solicitud. Revisa OPENAI_MODEL y vuelve a desplegar la función."
+          : "OpenAI no pudo procesar la factura en este momento. Revisa los logs de la Edge Function.";
+    return json({ error: message }, 502);
   }
 
   const result = await response.json();

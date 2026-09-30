@@ -172,7 +172,10 @@ export async function receptionsPage(root, access) {
     status.textContent='Análisis completado: '+summary.matched+' de '+summary.totalItems+' productos coincidieron con el catálogo.'+warningText;
     notice('Formulario prellenado. Revisa todos los datos antes de guardar.');
    }catch(error){
-    const rawMessage=error?.message||'';
+    let rawMessage=error?.message||'';
+    try{
+     if(error?.context?.json){const body=await error.context.json();if(body?.error)rawMessage=body.error;}
+    }catch{}
     const message=/row-level-security|violates row-level security/i.test(rawMessage)
       ? 'Supabase bloqueó la carga del archivo. Revisa la política RLS del bucket documentos-recepcion.'
       : rawMessage||'No se pudo analizar la factura.';
