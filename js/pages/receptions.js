@@ -7,6 +7,10 @@ const nullableNumber = value => value === '' || value == null ? null : Number(va
 const productLabel = product => `${product.codigo || 'Sin código'} · ${product.nombre}`;
 const limaToday = () => new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const limaDateTime = value => value ? new Intl.DateTimeFormat('es-PE',{timeZone:'America/Lima',dateStyle:'short',timeStyle:'medium'}).format(new Date(value)) : '—';
+const normalizeText = value => String(value || '').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const normalizeDigits = value => String(value || '').replace(/\D/g,'');
+const cleanFileName = value => String(value || 'factura').replace(/[^a-zA-Z0-9._-]/g,'_');
+const fileMime = file => file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : /\.jpe?g$/i.test(file.name) ? 'image/jpeg' : /\.png$/i.test(file.name) ? 'image/png' : /\.webp$/i.test(file.name) ? 'image/webp' : '');
 
 export async function receptionsPage(root, access) {
  let rows = [], providers = [], products = [], sites = [], lots = [], mainSite = null;
@@ -82,6 +86,94 @@ export async function receptionsPage(root, access) {
 
  function openReception(){
   if(!mainSite){notice(operationalSiteError(sites)||'Configura la sede de operación antes de registrar una recepción.',true);return;}
+  function setValue(form,name,value){
+   if(value===null||value===undefined||value==='')return;
+   const control=form.elements.namedItem(name);
+   if(control)control.value=String(value);
+  }
+  function providerMatch(provider){
+   const ruc=normalizeDigits(provider?.ruc);
+   const name=normalizeText(provider?.name);
+   if(ruc){const exact=providers.find(row=>normalizeDigits(row.documento)===ruc);if(exact)return exact;}
+   if(name){const exact=providers.find(row=>normalizeText(row.nombre)===name);if(exact)return exact;const partial=providers.filter(row=>normalizeText(row.nombre).includes(name)||name.includes(normalizeText(row.nombre)));if(partial.length===1)return partial[0];}
+   return null;
+  }
+  function productMatch(item){
+   const code=normalizeText(item?.code);
+   const name=normalizeText(item?.name||item?.description);
+   if(code){const exact=products.find(row=>normalizeText(row.codigo)===code||normalizeText(row.codigo_barras)===code);if(exact)return exact;}
+   if(name){const exact=products.find(row=>normalizeText(row.nombre)===name);if(exact)return exact;const partial=products.filter(row=>normalizeText(row.nombre).includes(name)||name.includes(normalizeText(row.nombre)));if(partial.length===1)return partial[0];}
+   return null;
+  }
+  function applyAnalysis(form,extraction){
+   const warnings=Array.isArray(extraction?.warnings)?[...extraction.warnings]:[];
+   const provider=providerMatch(extraction?.provider);
+   if(provider)setValue(form,'proveedor_id',provider.id);else if(extraction?.provider?.name||extraction?.provider?.ruc)warnings.push('No se encontró una coincidencia exacta para el proveedor; selecciónalo manualmente.');
+   const document=extraction?.document||{};
+   const type=normalizeText(document.type);
+   const typeValue=type.includes('boleta')?'Boleta':type.includes('guia')?'Guía':type.includes('credito')?'Nota de crédito':type.includes('factura')?'Factura':'';
+   if(typeValue)setValue(form,'tipo_comprobante',typeValue);
+   setValue(form,'serie',document.series);setValue(form,'numero',document.number);setValue(form,'fecha_emision',document.issue_date);
+   const currency=String(document.currency||'').toUpperCase();
+   if(['PEN','USD','EUR'].includes(currency))setValue(form,'moneda',currency);
+   setValue(form,'guia_remision',document.guide_number);setValue(form,'orden_compra',document.purchase_order);
+   const payment=extraction?.payment||{};
+   const paymentText=normalizeText(payment.method);
+   const paymentValue=['Efectivo','Transferencia','Tarjeta','Crédito','Yape / Plin'].find(value=>normalizeText(value)===paymentText);
+   if(paymentValue)setValue(form,'forma_pago',paymentValue);else if(payment.method)warnings.push('La forma de pago detectada no coincide con una opción; revísala manualmente.');
+   setValue(form,'condicion_pago',payment.condition);setValue(form,'fecha_vencimiento_pago',payment.due_date);
+   const paymentStatus=normalizeText(payment.status);
+   if(paymentStatus.includes('pagado'))setValue(form,'estado_pago','pagado');else if(paymentStatus.includes('parcial'))setValue(form,'estado_pago','parcial');else if(paymentStatus.includes('pendiente'))setValue(form,'estado_pago','pendiente');
+   const totals=extraction?.totals||{};
+   setValue(form,'subtotal',totals.subtotal);setValue(form,'descuento',totals.discount);setValue(form,'igv',totals.tax);setValue(form,'total',totals.total);setValue(form,'detraccion_porcentaje',totals.withholding_percent);setValue(form,'detraccion_monto',totals.withholding_amount);
+   const items=Array.isArray(extraction?.items)?extraction.items.filter(item=>item&&((item.name||item.code)||item.quantity_invoiced!=null)):[];
+   while(form.querySelectorAll('[data-reception-line]').length<items.length)form.__addReceptionLine?.();
+   const lines=[...form.querySelectorAll('[data-reception-line]')];
+   let matched=0;
+   items.forEach((item,index)=>{
+    const node=lines[index];if(!node)return;
+    const product=productMatch(item);const productControl=node.querySelector('[name^="producto_"]');
+    if(product){productControl.value=String(product.id);syncLine(node);matched++;}else if(item.name||item.code)warnings.push('No se encontró en el catálogo: '+(item.name||item.code)+'.');
+    setValue(form,'facturada_'+node.dataset.index,item.quantity_invoiced);
+    if(product&&item.lot_code){
+     const lot=lots.find(row=>String(row.producto_id)===String(product.id)&&normalizeText(row.codigo)===normalizeText(item.lot_code));
+     if(lot)setValue(form,'lote_'+node.dataset.index,lot.id);else warnings.push('El lote '+item.lot_code+' no existe todavía en el catálogo.');
+    }
+    if(product)setValue(form,'unidad_'+node.dataset.index,product.unidad_medida);
+    else if(item.unit)warnings.push('Confirma la unidad del producto '+(item.name||item.code||'detectado')+'.');
+    setValue(form,'precio_'+node.dataset.index,item.unit_price);
+   });
+   return { matched, totalItems:items.length, warnings };
+  }
+  async function analyzeInvoice(form){
+   const files=[...form.elements.archivos.files];const status=form.querySelector('#reception-ai-status');const button=form.querySelector('#analyze-reception-invoice');
+   if(!files.length){notice('Adjunta una foto o PDF antes de analizar la factura.',true);return;}
+   if(files.length>6){notice('Puedes analizar hasta 6 imágenes o archivos PDF a la vez.',true);return;}
+   const pending=[];
+   try{
+    button.disabled=true;status.textContent='Subiendo documento para analizar…';
+    for(const file of files){
+     const mime=fileMime(file);const max=mime==='application/pdf'?15:10;
+     if(!['application/pdf','image/jpeg','image/png','image/webp'].includes(mime))throw new Error('Solo se aceptan imágenes JPG, PNG o WEBP y archivos PDF.');
+     if(file.size>max*1024*1024)throw new Error('Un archivo supera el límite permitido.');
+     const path='ocr-pending/'+crypto.randomUUID()+'-'+cleanFileName(file.name);
+     const upload=await supabase.storage.from('documentos-recepcion').upload(path,file,{upsert:false,contentType:mime});
+     if(upload.error)throw upload.error;
+     const signed=await supabase.storage.from('documentos-recepcion').createSignedUrl(path,600);
+     if(signed.error)throw signed.error;
+     pending.push({path,url:signed.data.signedUrl,name:file.name,mime_type:mime});
+    }
+    status.textContent='Leyendo campos y productos…';
+    const result=await supabase.functions.invoke('analizar-factura',{body:{files:pending}});
+    if(result.error)throw result.error;
+    if(!result.data?.extraction)throw new Error(result.data?.error||'La inteligencia no devolvió datos.');
+    const summary=applyAnalysis(form,result.data.extraction);
+    const warningText=summary.warnings.length?' Revisa '+summary.warnings.length+' aviso(s).':'';
+    status.textContent='Análisis completado: '+summary.matched+' de '+summary.totalItems+' productos coincidieron con el catálogo.'+warningText;
+    notice('Formulario prellenado. Revisa todos los datos antes de guardar.');
+   }catch(error){status.textContent='No se pudo completar el análisis.';notice(error.message||'No se pudo analizar la factura.',true);}
+   finally{button.disabled=false;}
+  }
   openEditor({
    title:'Nueva recepción',
    fields:
@@ -106,12 +198,15 @@ export async function receptionsPage(root, access) {
       field('observaciones','Observaciones',{type:'textarea',maxLength:1000,help:'Diferencias o comentarios de la recepción.'})+'</div></details>'+
      '<p class="muted full-width">Agrega los productos de la misma factura con el botón +. La unidad se completa desde el catálogo y el lote solo es obligatorio cuando el producto lo requiere.</p><div id="reception-lines" class="full-width">'+line(0,true)+'</div>'+
      '<button type="button" id="add-reception-line" class="button full-width">+ Agregar producto</button>'+
-     '<label class="field full-width">Factura o comprobante (recomendado)<input name="archivos" type="file" accept="image/jpeg,image/png,application/pdf" multiple><small>Puedes adjuntar varias imágenes o un PDF. Máximo 10 MB por imagen y 15 MB por PDF.</small></label>',
+     '<label class="field full-width">Factura o comprobante (recomendado)<input name="archivos" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple><small>Puedes adjuntar varias imágenes o un PDF. Máximo 10 MB por imagen y 15 MB por PDF.</small></label>'+
+     '<div class="full-width reception-ai-actions"><button type="button" id="analyze-reception-invoice" class="button">Analizar factura automáticamente</button><span id="reception-ai-status" class="muted" role="status" aria-live="polite"></span></div>',
    setup:form=>{
     let next=1;const list=form.querySelector('#reception-lines');
     syncLine(list.querySelector('[data-reception-line]'));
     form.addEventListener('change',event=>{if(event.target.name?.startsWith('producto_'))syncLine(event.target.closest('[data-reception-line]'));});
-    form.querySelector('#add-reception-line').onclick=()=>{if(next>=50){notice('Se alcanzó el máximo de 50 productos por recepción.',true);return;}list.insertAdjacentHTML('beforeend',line(next));syncLine(list.lastElementChild);next++;};
+    form.__addReceptionLine=()=>{if(next>=50){notice('Se alcanzó el máximo de 50 productos por recepción.',true);return null;}list.insertAdjacentHTML('beforeend',line(next));syncLine(list.lastElementChild);next++;return list.lastElementChild;};
+    form.querySelector('#add-reception-line').onclick=form.__addReceptionLine;
+    form.querySelector('#analyze-reception-invoice').onclick=()=>analyzeInvoice(form);
     list.onclick=event=>{const button=event.target.closest('[data-remove-line]');if(button)button.closest('[data-reception-line]').remove();};
    },
    save:async values=>{
