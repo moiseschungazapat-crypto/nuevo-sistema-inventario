@@ -10,7 +10,7 @@ const limaDateTime = value => value ? new Intl.DateTimeFormat('es-PE',{timeZone:
 const normalizeText = value => String(value || '').normalize('NFD').replace(/\p{Diacritic}/gu,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const normalizeDigits = value => String(value || '').replace(/\D/g,'');
 const cleanFileName = value => String(value || 'factura').replace(/[^a-zA-Z0-9._-]/g,'_');
-const fileMime = file => file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : /\.jpe?g$/i.test(file.name) ? 'image/jpeg' : /\.png$/i.test(file.name) ? 'image/png' : /\.webp$/i.test(file.name) ? 'image/webp' : '');
+const fileMime = file => file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : /\.jpe?g$|\.jfif$/i.test(file.name) ? 'image/jpeg' : /\.png$/i.test(file.name) ? 'image/png' : /\.webp$/i.test(file.name) ? 'image/webp' : '');
 
 export async function receptionsPage(root, access) {
  let rows = [], providers = [], products = [], sites = [], lots = [], mainSite = null;
@@ -171,7 +171,14 @@ export async function receptionsPage(root, access) {
     const warningText=summary.warnings.length?' Revisa '+summary.warnings.length+' aviso(s).':'';
     status.textContent='Análisis completado: '+summary.matched+' de '+summary.totalItems+' productos coincidieron con el catálogo.'+warningText;
     notice('Formulario prellenado. Revisa todos los datos antes de guardar.');
-   }catch(error){status.textContent='No se pudo completar el análisis.';notice(error.message||'No se pudo analizar la factura.',true);}
+   }catch(error){
+    const rawMessage=error?.message||'';
+    const message=/row-level-security|violates row-level security/i.test(rawMessage)
+      ? 'Supabase bloqueó la carga del archivo. Revisa la política RLS del bucket documentos-recepcion.'
+      : rawMessage||'No se pudo analizar la factura.';
+    status.textContent=message;
+    notice(message,true);
+   }
    finally{button.disabled=false;}
   }
   openEditor({
@@ -198,7 +205,7 @@ export async function receptionsPage(root, access) {
       field('observaciones','Observaciones',{type:'textarea',maxLength:1000,help:'Diferencias o comentarios de la recepción.'})+'</div></details>'+
      '<p class="muted full-width">Agrega los productos de la misma factura con el botón +. La unidad se completa desde el catálogo y el lote solo es obligatorio cuando el producto lo requiere.</p><div id="reception-lines" class="full-width">'+line(0,true)+'</div>'+
      '<button type="button" id="add-reception-line" class="button full-width">+ Agregar producto</button>'+
-     '<label class="field full-width">Factura o comprobante (recomendado)<input name="archivos" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple><small>Puedes adjuntar varias imágenes o un PDF. Máximo 10 MB por imagen y 15 MB por PDF.</small></label>'+
+     '<label class="field full-width">Factura o comprobante (recomendado)<input name="archivos" type="file" accept="image/jpeg,image/png,image/webp,.jfif,application/pdf" multiple><small>Puedes adjuntar varias imágenes o un PDF. Máximo 10 MB por imagen y 15 MB por PDF.</small></label>'+
      '<div class="full-width reception-ai-actions"><button type="button" id="analyze-reception-invoice" class="button">Analizar factura automáticamente</button><span id="reception-ai-status" class="muted" role="status" aria-live="polite"></span></div>',
    setup:form=>{
     let next=1;const list=form.querySelector('#reception-lines');
@@ -222,7 +229,7 @@ export async function receptionsPage(root, access) {
     if(!detalles.length)throw new Error('Agrega al menos un producto.');
     const rid=await rpc('app_registrar_recepcion',{p_recepcion:{proveedor_id:values.proveedor_id,tipo_comprobante:values.tipo_comprobante,serie:values.serie.trim(),numero:values.numero.trim(),fecha_emision:values.fecha_emision,fecha_recepcion:values.fecha_recepcion,sede_id:String(mainSite.id),responsable:values.responsable.trim(),moneda:values.moneda,forma_pago:values.forma_pago||null,condicion_pago:values.condicion_pago?.trim()||null,fecha_vencimiento_pago:values.fecha_vencimiento_pago||null,guia_remision:values.guia_remision?.trim()||null,orden_compra:values.orden_compra?.trim()||null,subtotal:nullableNumber(values.subtotal),descuento:nullableNumber(values.descuento),igv:nullableNumber(values.igv),total:nullableNumber(values.total),estado_pago:values.estado_pago,detraccion_porcentaje:nullableNumber(values.detraccion_porcentaje),detraccion_monto:nullableNumber(values.detraccion_monto),observaciones:values.observaciones||'',detalles}});
     const files=values.__form.elements.archivos.files;
-    for(const file of files){const max=file.type==='application/pdf'?15:10;if(file.size>max*1024*1024)throw new Error('Un archivo supera el límite permitido.');const path=`${rid}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g,'_')}`;const upload=await supabase.storage.from('documentos-recepcion').upload(path,file,{upsert:false,contentType:file.type});if(upload.error)throw upload.error;const saved=await supabase.from('recepcion_archivos').insert({recepcion_id:rid,ruta:path,nombre:file.name,tipo:file.type,tamano:file.size});if(saved.error)throw saved.error;}
+    for(const file of files){const mime=fileMime(file);const max=mime==='application/pdf'?15:10;if(!['application/pdf','image/jpeg','image/png','image/webp'].includes(mime))throw new Error('Solo se aceptan imágenes JPG, PNG o WEBP y archivos PDF.');if(file.size>max*1024*1024)throw new Error('Un archivo supera el límite permitido.');const path=`${rid}/${crypto.randomUUID()}-${cleanFileName(file.name)}`;const upload=await supabase.storage.from('documentos-recepcion').upload(path,file,{upsert:false,contentType:mime});if(upload.error)throw upload.error;const saved=await supabase.from('recepcion_archivos').insert({recepcion_id:rid,ruta:path,nombre:file.name,tipo:mime,tamano:file.size});if(saved.error)throw saved.error;}
     notice('Recepción guardada; las existencias solo aumentaron para productos de stock.');await refresh();
    }
   });
