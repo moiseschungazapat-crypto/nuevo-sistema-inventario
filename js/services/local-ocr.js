@@ -25,23 +25,26 @@ function textScore(value) {
  return keywords * 500 + digits * 2 + Math.min(letters, 300) * 0.1;
 }
 
-async function enhancedImage(file, rotation = 0) {
+async function enhancedImage(file, rotation = 0, crop = false) {
  if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') return file;
  const bitmap = await createImageBitmap(file);
- const scale = Math.min(3, Math.max(1, 2200 / Math.max(bitmap.width, 1)));
+ const source = crop
+  ? { x: bitmap.width * 0.03, y: bitmap.height * 0.16, width: bitmap.width * 0.94, height: bitmap.height * 0.68 }
+  : { x: 0, y: 0, width: bitmap.width, height: bitmap.height };
+ const scale = Math.min(3, Math.max(1, 2400 / Math.max(source.width, 1)));
  const canvas = document.createElement('canvas');
  const normalizedRotation = ((rotation % 360) + 360) % 360;
  const rotated = normalizedRotation === 90 || normalizedRotation === 270;
- const width = Math.max(1, Math.round(bitmap.width * scale));
- const height = Math.max(1, Math.round(bitmap.height * scale));
+ const width = Math.max(1, Math.round(source.width * scale));
+ const height = Math.max(1, Math.round(source.height * scale));
  canvas.width = rotated ? height : width;
  canvas.height = rotated ? width : height;
  const context = canvas.getContext('2d', { willReadFrequently: true });
  context.imageSmoothingEnabled = false;
- context.filter = 'grayscale(1) contrast(1.35) brightness(1.08)';
+ context.filter = 'grayscale(1) contrast(1.55) brightness(1.12)';
  context.translate(canvas.width / 2, canvas.height / 2);
  context.rotate(normalizedRotation * Math.PI / 180);
- context.drawImage(bitmap, -width / 2, -height / 2, width, height);
+ context.drawImage(bitmap, source.x, source.y, source.width, source.height, -width / 2, -height / 2, width, height);
  bitmap.close?.();
  return canvas;
 }
@@ -256,6 +259,16 @@ export function extractInvoice(text, providers, products) {
  };
  if (totals.total != null && totals.subtotal != null && totals.total < totals.subtotal) totals.total = null;
  if (totals.tax != null && totals.total != null && totals.tax > totals.total) totals.tax = null;
+ const discount = totals.discount || 0;
+ if (totals.total == null && totals.subtotal != null && totals.tax != null) {
+  totals.total = Number((totals.subtotal - discount + totals.tax).toFixed(2));
+ } else if (totals.tax == null && totals.subtotal != null && totals.total != null) {
+  const calculatedTax = totals.total - totals.subtotal + discount;
+  if (calculatedTax >= 0) totals.tax = Number(calculatedTax.toFixed(2));
+ } else if (totals.subtotal == null && totals.tax != null && totals.total != null) {
+  const calculatedSubtotal = totals.total - totals.tax + discount;
+  if (calculatedSubtotal >= 0) totals.subtotal = Number(calculatedSubtotal.toFixed(2));
+ }
  const items = productData(cleanedText, products, totals);
  const warnings = [
   'Lectura local: revisa todos los campos antes de guardar.',
@@ -280,6 +293,30 @@ export function extractInvoice(text, providers, products) {
  return { provider, document, payment, totals, items, warnings };
 }
 
+function extractionScore(extraction) {
+ const document = extraction.document || {};
+ const totals = extraction.totals || {};
+ const items = extraction.items || [];
+ let score = 0;
+ if (extraction.provider?.name) score += 500;
+ if (document.series) score += 250;
+ if (document.number) score += 250;
+ if (document.issue_date) score += 250;
+ if (totals.subtotal != null) score += 600;
+ if (totals.tax != null) score += 600;
+ if (totals.total != null) score += 800;
+ if (totals.subtotal != null && totals.tax != null && totals.total != null) {
+  const expected = totals.subtotal - (totals.discount || 0) + totals.tax;
+  if (Math.abs(expected - totals.total) <= Math.max(0.1, totals.total * 0.005)) score += 1800;
+ }
+ for (const item of items) {
+  score += 700;
+  if (item.quantity_invoiced != null) score += 350;
+  if (item.unit_price != null) score += 350;
+ }
+ return score;
+}
+
 export async function analyzeInvoiceLocally(files, { providers = [], products = [], onProgress = () => {} } = {}) {
  if (!globalThis.Tesseract?.createWorker) {
   throw new Error('No se pudo cargar el motor OCR gratuito. Revisa tu conexión a internet y vuelve a intentarlo.');
@@ -302,14 +339,22 @@ export async function analyzeInvoiceLocally(files, { providers = [], products = 
    onProgress(0, index + 1, files.length);
    const original = (await worker.recognize(files[index]))?.data?.text || '';
    const candidates = [original];
-   if (invoiceKeywordCount(original) < 2) {
-    for (const rotation of [0, 90, 270]) {
+   const enhanced = await enhancedImage(files[index]);
+   candidates.push((await worker.recognize(enhanced))?.data?.text || '');
+   await worker.setParameters?.({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' });
+   const cropped = await enhancedImage(files[index], 0, true);
+   candidates.push((await worker.recognize(cropped))?.data?.text || '');
+   await worker.setParameters?.({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1' });
+   if (Math.max(...candidates.map(invoiceKeywordCount)) < 3) {
+    for (const rotation of [90, 270]) {
      const prepared = await enhancedImage(files[index], rotation);
      candidates.push((await worker.recognize(prepared))?.data?.text || '');
-     if (invoiceKeywordCount(candidates.at(-1)) >= 4) break;
     }
    }
-   texts.push(candidates.sort((a, b) => textScore(b) - textScore(a))[0]);
+   const ranked = candidates
+    .map(text => ({ text, extraction: extractInvoice(text, providers, products) }))
+    .sort((a, b) => extractionScore(b.extraction) - extractionScore(a.extraction) || textScore(b.text) - textScore(a.text));
+   texts.push(ranked[0].text);
   }
   const text = texts.filter(Boolean).join('\n');
   if (!text.trim()) throw new Error('El OCR no pudo leer texto. Usa una foto nítida, bien iluminada y sin inclinación.');
