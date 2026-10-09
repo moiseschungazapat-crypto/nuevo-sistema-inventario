@@ -55,8 +55,9 @@ export function openEditor({title, fields, save, setup}) {
  dialog.showModal();
 }
 export function pager(node, total, page, pageSize, change) {
- const pages = Math.max(1, Math.ceil(total/pageSize));
- node.innerHTML = `<span>${total} registros · Página ${page+1} de ${pages}</span><div class="actions"><button class="button" data-prev ${page===0?'disabled':''}>Anterior</button><button class="button" data-next ${page+1>=pages?'disabled':''}>Siguiente</button></div>`;
+ const safeTotal = Number.isFinite(Number(total)) ? Math.max(0, Number(total)) : 0;
+ const pages = Math.max(1, Math.ceil(safeTotal/pageSize));
+ node.innerHTML = `<span>${safeTotal} registros · Página ${page+1} de ${pages}</span><div class="actions"><button class="button" data-prev ${page===0?'disabled':''}>Anterior</button><button class="button" data-next ${page+1>=pages?'disabled':''}>Siguiente</button></div>`;
  node.querySelector('[data-prev]').onclick = ()=>change(page-1);
  node.querySelector('[data-next]').onclick = ()=>change(page+1);
 }

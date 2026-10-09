@@ -123,7 +123,14 @@ export async function catalogHubPage(root, access, initialView = 'categorias') {
   root.querySelectorAll('[data-edit-category]').forEach(button => button.onclick = () => edit('categorias',categories.find(row => String(row.id) === button.dataset.editCategory)));
   root.querySelectorAll('[data-edit-product]').forEach(button => button.onclick = () => edit('productos',products.find(row => String(row.id) === button.dataset.editProduct)));
   root.querySelectorAll('[data-view-products]').forEach(button => button.onclick = () => { view = 'productos'; selectedCategory = button.dataset.viewProducts; state.search = ''; page = 0; bindView(); });
-  pager(root.querySelector('#catalog-pager'),(view === 'categorias' ? categories : products).filter(row => view === 'categorias' ? (state.status === '' || String(row.estado) === state.status) && String(row.nombre || '').toLocaleLowerCase().includes(state.search) : (state.status === '' || String(row.estado) === state.status) && (!selectedCategory || String(row.categoria_id) === String(selectedCategory)) && [row.nombre,row.codigo,row.marca,row.presentacion].some(value => String(value || '').toLocaleLowerCase().includes(state.search))),page,20,value => { page = value; bindView(); });
+  const visibleRows = (view === 'categorias' ? categories : products).filter(row => {
+   if (view === 'categorias') return (state.status === '' || String(row.estado) === state.status) && String(row.nombre || '').toLocaleLowerCase().includes(state.search);
+   return (state.status === '' || String(row.estado) === state.status) &&
+    (!selectedCategory || String(row.categoria_id) === String(selectedCategory)) &&
+    [row.nombre,row.codigo,row.marca,row.presentacion].some(value => String(value || '').toLocaleLowerCase().includes(state.search));
+  });
+  const visibleCount = visibleRows.length;
+  pager(root.querySelector('#catalog-pager'),visibleCount,page,20,value => { page = value; bindView(); });
  }
 
  root.querySelectorAll('[data-view]').forEach(button => button.onclick = () => { view = button.dataset.view; selectedCategory = ''; state.search = ''; page = 0; bindView(); });
