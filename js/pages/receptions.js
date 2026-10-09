@@ -2,6 +2,7 @@ import { allRows, rpc } from '../services/data.js';
 import { supabase } from '../supabase.js';
 import { heading, e, table, field, options, openEditor, notice, loadError } from '../components/ui.js';
 import { operationalSite, operationalSiteError, operationalSiteLabel } from '../utils/single-site.js';
+import { analyzeInvoiceLocally } from '../services/local-ocr.js';
 
 const nullableNumber = value => value === '' || value == null ? null : Number(value);
 const productLabel = product => `${product.codigo || 'Sin código'} · ${product.nombre}`;
@@ -147,37 +148,25 @@ export async function receptionsPage(root, access) {
   }
   async function analyzeInvoice(form){
    const files=[...form.elements.archivos.files];const status=form.querySelector('#reception-ai-status');const button=form.querySelector('#analyze-reception-invoice');
-   if(!files.length){notice('Adjunta una foto o PDF antes de analizar la factura.',true);return;}
-   if(files.length>6){notice('Puedes analizar hasta 6 imágenes o archivos PDF a la vez.',true);return;}
-   const pending=[];
+   const preview=form.querySelector('#reception-ocr-preview');const previewText=form.querySelector('#reception-ocr-text');
+   if(!files.length){notice('Adjunta una imagen antes de analizar la factura.',true);return;}
+   if(files.length>6){notice('Puedes analizar hasta 6 imágenes a la vez.',true);return;}
    try{
-    button.disabled=true;status.textContent='Subiendo documento para analizar…';
-    for(const file of files){
-     const mime=fileMime(file);const max=mime==='application/pdf'?15:10;
-     if(!['application/pdf','image/jpeg','image/png','image/webp'].includes(mime))throw new Error('Solo se aceptan imágenes JPG, PNG o WEBP y archivos PDF.');
-     if(file.size>max*1024*1024)throw new Error('Un archivo supera el límite permitido.');
-     const path='ocr-pending/'+crypto.randomUUID()+'-'+cleanFileName(file.name);
-     const upload=await supabase.storage.from('documentos-recepcion').upload(path,file,{upsert:false,contentType:mime});
-     if(upload.error)throw upload.error;
-     const signed=await supabase.storage.from('documentos-recepcion').createSignedUrl(path,600);
-     if(signed.error)throw signed.error;
-     pending.push({path,url:signed.data.signedUrl,name:file.name,mime_type:mime});
-    }
-    status.textContent='Leyendo campos y productos…';
-    const result=await supabase.functions.invoke('analizar-factura',{body:{files:pending}});
-    if(result.error)throw result.error;
-    if(!result.data?.extraction)throw new Error(result.data?.error||'La inteligencia no devolvió datos.');
-    const summary=applyAnalysis(form,result.data.extraction);
+    button.disabled=true;status.textContent='Cargando OCR gratuito…';
+    for(const file of files){const mime=fileMime(file);const max=mime==='application/pdf'?15:10;if(!['image/jpeg','image/png','image/webp'].includes(mime))throw new Error('El análisis gratuito acepta imágenes JPG, PNG o WEBP.');if(file.size>max*1024*1024)throw new Error('Un archivo supera el límite permitido.');}
+    const result=await analyzeInvoiceLocally(files,{providers,products,onProgress:(progress,index,total)=>{status.textContent=total?`Leyendo imagen ${index} de ${total}… ${progress}%`:`Leyendo factura… ${progress}%`;}});
+    if(previewText){previewText.textContent=result.text;preview.hidden=false;}
+    const summary=applyAnalysis(form,result.extraction);
     const warningText=summary.warnings.length?' Revisa '+summary.warnings.length+' aviso(s).':'';
-    status.textContent='Análisis completado: '+summary.matched+' de '+summary.totalItems+' productos coincidieron con el catálogo.'+warningText;
-    notice('Formulario prellenado. Revisa todos los datos antes de guardar.');
+    status.textContent='Lectura gratuita completada: '+summary.matched+' producto(s) coincidieron con el catálogo.'+warningText;
+    notice('Formulario prellenado con OCR local. Revisa todos los datos antes de guardar.');
    }catch(error){
     let rawMessage=error?.message||'';
     try{
      if(error?.context?.json){const body=await error.context.json();if(body?.error)rawMessage=body.error;}
     }catch{}
     const message=/row-level-security|violates row-level security/i.test(rawMessage)
-      ? 'Supabase bloqueó la carga del archivo. Revisa la política RLS del bucket documentos-recepcion.'
+     ? 'Supabase bloqueó la carga del archivo. Revisa la política RLS del bucket documentos-recepcion.'
       : rawMessage||'No se pudo analizar la factura.';
     status.textContent=message;
     notice(message,true);
@@ -208,8 +197,9 @@ export async function receptionsPage(root, access) {
       field('observaciones','Observaciones',{type:'textarea',maxLength:1000,help:'Diferencias o comentarios de la recepción.'})+'</div></details>'+
      '<p class="muted full-width">Agrega los productos de la misma factura con el botón +. La unidad se completa desde el catálogo y el lote solo es obligatorio cuando el producto lo requiere.</p><div id="reception-lines" class="full-width">'+line(0,true)+'</div>'+
      '<button type="button" id="add-reception-line" class="button full-width">+ Agregar producto</button>'+
-     '<label class="field full-width">Factura o comprobante (recomendado)<input name="archivos" type="file" accept="image/jpeg,image/png,image/webp,.jfif,application/pdf" multiple><small>Puedes adjuntar varias imágenes o un PDF. Máximo 10 MB por imagen y 15 MB por PDF.</small></label>'+
-     '<div class="full-width reception-ai-actions"><button type="button" id="analyze-reception-invoice" class="button">Analizar factura automáticamente</button><span id="reception-ai-status" class="muted" role="status" aria-live="polite"></span></div>',
+     '<label class="field full-width">Factura o comprobante (recomendado)<input name="archivos" type="file" accept="image/jpeg,image/png,image/webp,.jfif,application/pdf" multiple><small>Puedes adjuntar imágenes o PDF. El análisis gratuito acepta JPG, PNG y WEBP; el PDF se guarda, pero debes convertirlo a imagen para leerlo.</small></label>'+
+     '<div class="full-width reception-ai-actions"><button type="button" id="analyze-reception-invoice" class="button">Analizar factura gratis (OCR)</button><span id="reception-ai-status" class="muted" role="status" aria-live="polite"></span></div>'+
+     '<details id="reception-ocr-preview" class="reception-ocr-preview full-width" hidden><summary>Ver texto leído por el OCR</summary><pre id="reception-ocr-text"></pre></details>',
    setup:form=>{
     let next=1;const list=form.querySelector('#reception-lines');
     syncLine(list.querySelector('[data-reception-line]'));
