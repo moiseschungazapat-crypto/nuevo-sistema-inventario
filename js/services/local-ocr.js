@@ -7,6 +7,35 @@ const normalizeText = value => String(value || '')
 
 const normalizeDigits = value => String(value || '').replace(/\D/g, '');
 
+function compactNumericSpacing(value) {
+ return String(value || '')
+  .replace(/(\d)\s+(?=\d)/g, '$1')
+  .replace(/\s*([\/.-])\s*/g, '$1');
+}
+
+function textScore(value) {
+ const text = String(value || '');
+ const keywords = (text.match(/ruc|factura|boleta|fecha|total|igv|subtotal|producto|cantidad/gi) || []).length;
+ const digits = (text.match(/\d/g) || []).length;
+ const letters = (text.match(/[a-záéíóúñ]/gi) || []).length;
+ return keywords * 50 + digits * 3 + Math.min(letters, 300) * 0.2;
+}
+
+async function enhancedImage(file) {
+ if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') return file;
+ const bitmap = await createImageBitmap(file);
+ const scale = Math.min(3, Math.max(1, 2200 / Math.max(bitmap.width, 1)));
+ const canvas = document.createElement('canvas');
+ canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+ canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+ const context = canvas.getContext('2d', { willReadFrequently: true });
+ context.imageSmoothingEnabled = false;
+ context.filter = 'grayscale(1) contrast(1.35) brightness(1.08)';
+ context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+ bitmap.close?.();
+ return canvas;
+}
+
 function parseAmount(value) {
  const raw = String(value || '').replace(/[^0-9.,-]/g, '');
  if (!raw) return null;
@@ -71,14 +100,50 @@ function documentData(text) {
 }
 
 function providerData(text, providers) {
- const candidates = [...String(text || '').matchAll(/\b\d{11}\b/g)].map(match => match[0]);
- const known = providers.find(row => candidates.includes(normalizeDigits(row.documento)));
+ const compact = compactNumericSpacing(text);
+ const candidates = [...compact.matchAll(/\b\d{11}\b/g)].map(match => match[0]);
+ const lineCandidates = String(text || '').split(/\r?\n/).flatMap(line => {
+  const digits = normalizeDigits(line);
+  return digits.length >= 11 ? Array.from({ length: digits.length - 10 }, (_, index) => digits.slice(index, index + 11)) : [];
+ });
+ candidates.push(...lineCandidates);
+ const knownByRuc = providers.find(row => candidates.includes(normalizeDigits(row.documento)));
+ const knownByName = providers.find(row => approximateLineMatch(text, row.nombre));
+ const known = knownByRuc || knownByName;
  const ruc = known?.documento || candidates[0] || null;
  return { name: known?.nombre || null, ruc };
 }
 
+function editDistance(first, second) {
+ const a = String(first || ''), b = String(second || '');
+ const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+ for (let i = 1; i <= a.length; i += 1) {
+  const current = [i];
+  for (let j = 1; j <= b.length; j += 1) {
+   current[j] = Math.min(
+    current[j - 1] + 1,
+    previous[j] + 1,
+    previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+   );
+  }
+  for (let j = 0; j < current.length; j += 1) previous[j] = current[j];
+ }
+ return previous[b.length];
+}
+
+function approximateLineMatch(text, phrase) {
+ const target = normalizeText(phrase);
+ if (!target || target.length < 5) return false;
+ if (normalizeText(text).includes(target)) return true;
+ return String(text || '').split(/\r?\n/).some(line => {
+  const candidate = normalizeText(line);
+  if (!candidate) return false;
+  const distance = editDistance(candidate, target);
+  return distance / Math.max(candidate.length, target.length) <= (target.length > 14 ? 0.35 : 0.25);
+ });
+}
+
 function productData(text, products) {
- const normalized = normalizeText(text);
  const seen = new Set();
  return products
   .filter(product => product.estado && (product.nombre || product.codigo))
@@ -86,7 +151,7 @@ function productData(text, products) {
   .filter(product => {
    const name = normalizeText(product.nombre);
    const code = normalizeText(product.codigo);
-   const found = (name.length >= 4 && normalized.includes(name)) || (code && normalized.includes(code));
+   const found = (name.length >= 4 && approximateLineMatch(text, product.nombre)) || (code && normalizeText(text).includes(code));
    if (!found || seen.has(product.id)) return false;
    seen.add(product.id);
    return true;
@@ -105,9 +170,10 @@ function productData(text, products) {
 }
 
 function extractInvoice(text, providers, products) {
- const document = documentData(text);
- const provider = providerData(text, providers);
- const items = productData(text, products);
+ const cleanedText = compactNumericSpacing(text);
+ const document = documentData(cleanedText);
+ const provider = providerData(cleanedText, providers);
+ const items = productData(cleanedText, products);
  const warnings = [
   'Lectura local: revisa todos los campos antes de guardar.',
   'Las cantidades facturadas, recibidas, precios y lotes deben confirmarse manualmente.',
@@ -147,11 +213,18 @@ export async function analyzeInvoiceLocally(files, { providers = [], products = 
   },
  });
  try {
+  await worker.setParameters?.({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' });
   const texts = [];
   for (let index = 0; index < files.length; index += 1) {
    onProgress(0, index + 1, files.length);
-   const result = await worker.recognize(files[index]);
-   texts.push(result?.data?.text || '');
+   const original = (await worker.recognize(files[index]))?.data?.text || '';
+   let best = original;
+   if (textScore(original) < 100) {
+    const prepared = await enhancedImage(files[index]);
+    const enhanced = (await worker.recognize(prepared))?.data?.text || '';
+    if (textScore(enhanced) > textScore(best)) best = enhanced;
+   }
+   texts.push(best);
   }
   const text = texts.filter(Boolean).join('\n');
   if (!text.trim()) throw new Error('El OCR no pudo leer texto. Usa una foto nítida, bien iluminada y sin inclinación.');
