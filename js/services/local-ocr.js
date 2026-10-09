@@ -9,29 +9,39 @@ const normalizeDigits = value => String(value || '').replace(/\D/g, '');
 
 function compactNumericSpacing(value) {
  return String(value || '')
-  .replace(/(\d)\s+(?=\d)/g, '$1')
-  .replace(/\s*([\/.-])\s*/g, '$1');
+  .replace(/(\d)[ \t]+(?=\d)/g, '$1')
+  .replace(/[ \t]*([\/.-])[ \t]*/g, '$1');
+}
+
+function invoiceKeywordCount(value) {
+ return (String(value || '').match(/ruc|factura|boleta|fecha|total|igv|subtotal|cliente|cantidad/gi) || []).length;
 }
 
 function textScore(value) {
  const text = String(value || '');
- const keywords = (text.match(/ruc|factura|boleta|fecha|total|igv|subtotal|producto|cantidad/gi) || []).length;
+ const keywords = invoiceKeywordCount(text);
  const digits = (text.match(/\d/g) || []).length;
  const letters = (text.match(/[a-záéíóúñ]/gi) || []).length;
- return keywords * 50 + digits * 3 + Math.min(letters, 300) * 0.2;
+ return keywords * 500 + digits * 2 + Math.min(letters, 300) * 0.1;
 }
 
-async function enhancedImage(file) {
+async function enhancedImage(file, rotation = 0) {
  if (typeof createImageBitmap !== 'function' || typeof document === 'undefined') return file;
  const bitmap = await createImageBitmap(file);
  const scale = Math.min(3, Math.max(1, 2200 / Math.max(bitmap.width, 1)));
  const canvas = document.createElement('canvas');
- canvas.width = Math.max(1, Math.round(bitmap.width * scale));
- canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+ const normalizedRotation = ((rotation % 360) + 360) % 360;
+ const rotated = normalizedRotation === 90 || normalizedRotation === 270;
+ const width = Math.max(1, Math.round(bitmap.width * scale));
+ const height = Math.max(1, Math.round(bitmap.height * scale));
+ canvas.width = rotated ? height : width;
+ canvas.height = rotated ? width : height;
  const context = canvas.getContext('2d', { willReadFrequently: true });
  context.imageSmoothingEnabled = false;
  context.filter = 'grayscale(1) contrast(1.35) brightness(1.08)';
- context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+ context.translate(canvas.width / 2, canvas.height / 2);
+ context.rotate(normalizedRotation * Math.PI / 180);
+ context.drawImage(bitmap, -width / 2, -height / 2, width, height);
  bitmap.close?.();
  return canvas;
 }
@@ -72,6 +82,14 @@ function firstAmount(text, labels) {
  return match ? parseAmount(match[1]) : null;
 }
 
+function prioritizedAmount(text, labels) {
+ for (const label of labels) {
+  const amount = firstAmount(text, label);
+  if (amount != null) return amount;
+ }
+ return null;
+}
+
 function firstDate(text) {
  const labeled = String(text || '').match(/(?:fecha\s*(?:de\s*)?(?:emision|emisión)|emision|emisión)[^\d]{0,35}((?:\d{1,4}[\/.\-]){2}\d{1,4})/i);
  if (labeled) return toIsoDate(labeled[1]);
@@ -87,7 +105,7 @@ function documentData(text) {
    : /gu[ií]a\s*de\s*remisi[oó]n|gu[ií]a/i.test(text)
     ? 'Guía'
     : /factura/i.test(text) ? 'Factura' : null;
- const number = String(text || '').match(/\b([FB]\s*\d{3})\s*[-:#\s]\s*(\d{1,12})\b/i);
+ const number = String(text || '').match(/\b([A-Z]\s*\d{3})\s*[-:#\s]\s*(\d{1,12})\b/i);
  return {
   type,
   series: number ? number[1].replace(/\s/g, '') : null,
@@ -145,6 +163,7 @@ function approximateLineMatch(text, phrase) {
 
 function productData(text, products) {
  const seen = new Set();
+ const lines = String(text || '').split(/\r?\n/);
  return products
   .filter(product => product.estado && (product.nombre || product.codigo))
   .sort((a, b) => normalizeText(b.nombre).length - normalizeText(a.nombre).length)
@@ -157,16 +176,30 @@ function productData(text, products) {
    return true;
   })
   .slice(0, 50)
-  .map(product => ({
-   code: product.codigo || null,
-   name: product.nombre || null,
-   description: null,
-   quantity_invoiced: null,
-   unit: product.unidad_medida || null,
-   unit_price: null,
-   lot_code: null,
-   expiration_date: null,
-  }));
+  .map(product => {
+   const productName = normalizeText(product.nombre);
+   let matchingIndex = lines.findIndex(line => normalizeText(line).includes(productName));
+   if (matchingIndex < 0) matchingIndex = lines.findIndex(line => approximateLineMatch(line, product.nombre));
+   const nearbyText = matchingIndex >= 0
+    ? lines
+     .slice(Math.max(0, matchingIndex - 3), matchingIndex + 4)
+     .filter(line => !/ruc|fecha|factura|boleta|serie|sub\s*total|importe\s+total|\bigv\b/i.test(line))
+     .join(' ')
+    : '';
+   const amounts = [...nearbyText.matchAll(/\b\d+(?:[.,]\d+)?\b/g)]
+    .map(match => parseAmount(match[0]))
+    .filter(value => value != null);
+   return {
+    code: product.codigo || null,
+    name: product.nombre || null,
+    description: null,
+    quantity_invoiced: amounts[0] ?? null,
+    unit: product.unidad_medida || null,
+    unit_price: amounts.length > 1 ? amounts.at(-1) : null,
+    lot_code: null,
+    expiration_date: null,
+   };
+  });
 }
 
 function extractInvoice(text, providers, products) {
@@ -181,10 +214,10 @@ function extractInvoice(text, providers, products) {
  if (!provider.name) warnings.push('El RUC no coincidió con un proveedor del catálogo; selecciónalo manualmente.');
  if (!items.length) warnings.push('No se reconocieron productos del catálogo en el texto leído.');
  const totals = {
-  subtotal: firstAmount(text, 'subtotal|valor\s+de\s+venta|op\.?\s+gravada'),
-  discount: firstAmount(text, 'descuento'),
-  tax: firstAmount(text, 'igv|i\.?g\.?v\.?'),
-  total: firstAmount(text, 'importe\s+total|total\s+a\s+pagar|total'),
+  subtotal: prioritizedAmount(text, ['sub\\s*total\\s*(?:ventas?)?', 'valor\\s+de\\s+venta', 'op\\.?\\s+gravada']),
+  discount: prioritizedAmount(text, ['descuento']),
+  tax: prioritizedAmount(text, ['\\bigv\\b', 'i\\.?g\\.?v\\.?']),
+  total: prioritizedAmount(text, ['importe\\s+total', 'total\\s+a\\s+pagar', '(?:^|\\n)\\s*total']),
   withholding_percent: null,
   withholding_amount: null,
  };
@@ -213,18 +246,20 @@ export async function analyzeInvoiceLocally(files, { providers = [], products = 
   },
  });
  try {
-  await worker.setParameters?.({ tessedit_pageseg_mode: '6', preserve_interword_spaces: '1' });
+  await worker.setParameters?.({ tessedit_pageseg_mode: '11', preserve_interword_spaces: '1' });
   const texts = [];
   for (let index = 0; index < files.length; index += 1) {
    onProgress(0, index + 1, files.length);
    const original = (await worker.recognize(files[index]))?.data?.text || '';
-   let best = original;
-   if (textScore(original) < 100) {
-    const prepared = await enhancedImage(files[index]);
-    const enhanced = (await worker.recognize(prepared))?.data?.text || '';
-    if (textScore(enhanced) > textScore(best)) best = enhanced;
+   const candidates = [original];
+   if (invoiceKeywordCount(original) < 2) {
+    for (const rotation of [0, 90, 270]) {
+     const prepared = await enhancedImage(files[index], rotation);
+     candidates.push((await worker.recognize(prepared))?.data?.text || '');
+     if (invoiceKeywordCount(candidates.at(-1)) >= 4) break;
+    }
    }
-   texts.push(best);
+   texts.push(candidates.sort((a, b) => textScore(b) - textScore(a))[0]);
   }
   const text = texts.filter(Boolean).join('\n');
   if (!text.trim()) throw new Error('El OCR no pudo leer texto. Usa una foto nítida, bien iluminada y sin inclinación.');
