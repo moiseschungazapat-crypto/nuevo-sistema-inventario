@@ -54,12 +54,38 @@ function parseAmount(value) {
  const dot = raw.lastIndexOf('.');
  if (comma >= 0 && dot >= 0) {
   normalized = comma > dot ? raw.replace(/\./g, '').replace(',', '.') : raw.replace(/,/g, '');
+ } else if ((raw.match(/\./g) || []).length > 1) {
+  const last = raw.lastIndexOf('.');
+  normalized = `${raw.slice(0, last).replace(/\./g, '')}${raw.slice(last)}`;
  } else if (comma >= 0) {
   const decimals = raw.length - comma - 1;
   normalized = decimals === 1 || decimals === 2 ? raw.replace(',', '.') : raw.replace(/,/g, '');
  }
  const result = Number(normalized);
  return Number.isFinite(result) ? result : null;
+}
+
+function amountCandidates(value) {
+ return [...String(value || '').matchAll(/(?:S\s*\/\s*|US\$\s*)?\d[\d.,]*(?:[.,]\d{2})/gi)]
+  .map(match => ({ raw: match[0], value: parseAmount(match[0]) }))
+  .filter(candidate => candidate.value != null);
+}
+
+function amountBesideLabel(text, labels) {
+ const lines = String(text || '').split(/\r?\n/);
+ for (const label of labels) {
+  const expression = new RegExp(label, 'i');
+  for (let index = 0; index < lines.length; index += 1) {
+   const match = lines[index].match(expression);
+   if (!match) continue;
+   const afterLabel = lines[index].slice((match.index || 0) + match[0].length);
+   const sameLine = amountCandidates(afterLabel);
+   if (sameLine.length) return sameLine.at(-1).value;
+   const nextLine = amountCandidates(lines[index + 1] || '');
+   if (nextLine.length === 1) return nextLine[0].value;
+  }
+ }
+ return null;
 }
 
 function toIsoDate(value) {
@@ -84,7 +110,7 @@ function firstAmount(text, labels) {
 
 function prioritizedAmount(text, labels) {
  for (const label of labels) {
-  const amount = firstAmount(text, label);
+  const amount = amountBesideLabel(text, [label]) ?? firstAmount(text, label);
   if (amount != null) return amount;
  }
  return null;
@@ -95,6 +121,15 @@ function firstDate(text) {
  if (labeled) return toIsoDate(labeled[1]);
  const fallback = String(text || '').match(/\b(?:\d{1,4}[\/.\-]){2}\d{1,4}\b/);
  return fallback ? toIsoDate(fallback[0]) : null;
+}
+
+function dateAfterLabel(text, label) {
+ const source = String(text || '');
+ const match = source.match(label);
+ if (!match) return null;
+ const following = source.slice((match.index || 0) + match[0].length, (match.index || 0) + match[0].length + 160);
+ const date = following.match(/\b(?:\d{1,4}[\/.\-]){2}\d{1,4}\b/);
+ return date ? toIsoDate(date[0]) : null;
 }
 
 function documentData(text) {
@@ -161,7 +196,7 @@ function approximateLineMatch(text, phrase) {
  });
 }
 
-function productData(text, products) {
+function productData(text, products, totals = {}) {
  const seen = new Set();
  const lines = String(text || '').split(/\r?\n/);
  return products
@@ -188,31 +223,29 @@ function productData(text, products) {
     : '';
    const amounts = [...nearbyText.matchAll(/\b\d+(?:[.,]\d+)?\b/g)]
     .map(match => parseAmount(match[0]))
-    .filter(value => value != null);
+    .filter(value => value != null && value > 0);
+   const quantity = amounts[0] ?? null;
+   const calculatedPrice = quantity && totals.subtotal
+    ? Number((totals.subtotal / quantity).toFixed(4))
+    : null;
+   const printedPrices = amounts.slice(1).filter(value => value < (totals.subtotal || Number.POSITIVE_INFINITY));
    return {
     code: product.codigo || null,
     name: product.nombre || null,
     description: null,
-    quantity_invoiced: amounts[0] ?? null,
+    quantity_invoiced: quantity,
     unit: product.unidad_medida || null,
-    unit_price: amounts.length > 1 ? amounts.at(-1) : null,
+    unit_price: printedPrices[0] ?? calculatedPrice,
     lot_code: null,
     expiration_date: null,
    };
   });
 }
 
-function extractInvoice(text, providers, products) {
+export function extractInvoice(text, providers, products) {
  const cleanedText = compactNumericSpacing(text);
  const document = documentData(cleanedText);
  const provider = providerData(cleanedText, providers);
- const items = productData(cleanedText, products);
- const warnings = [
-  'Lectura local: revisa todos los campos antes de guardar.',
-  'Las cantidades facturadas, recibidas, precios y lotes deben confirmarse manualmente.',
- ];
- if (!provider.name) warnings.push('El RUC no coincidió con un proveedor del catálogo; selecciónalo manualmente.');
- if (!items.length) warnings.push('No se reconocieron productos del catálogo en el texto leído.');
  const totals = {
   subtotal: prioritizedAmount(text, ['sub\\s*total\\s*(?:ventas?)?', 'valor\\s+de\\s+venta', 'op\\.?\\s+gravada']),
   discount: prioritizedAmount(text, ['descuento']),
@@ -221,9 +254,26 @@ function extractInvoice(text, providers, products) {
   withholding_percent: null,
   withholding_amount: null,
  };
+ if (totals.total != null && totals.subtotal != null && totals.total < totals.subtotal) totals.total = null;
+ if (totals.tax != null && totals.total != null && totals.tax > totals.total) totals.tax = null;
+ const items = productData(cleanedText, products, totals);
+ const warnings = [
+  'Lectura local: revisa todos los campos antes de guardar.',
+  'Confirma la cantidad recibida y el lote antes de guardar.',
+ ];
+ if (!provider.name) warnings.push('El RUC no coincidió con un proveedor del catálogo; selecciónalo manualmente.');
+ if (!items.length) warnings.push('No se reconocieron productos del catálogo. Si el nombre sí aparece en la factura, primero registra ese producto en Catálogo.');
  if (totals.total == null) warnings.push('No se identificó el total del comprobante.');
+ const creditDays = String(text || '').match(/cr[eé]dito\D{0,20}(\d{1,3})\s*d[ií]as?/i);
+ const dueDate = dateAfterLabel(text, /(?:fec(?:ha)?\.?\s*venc(?:imiento)?\.?|vence)/i);
+ const issueTime = document.issue_date ? new Date(`${document.issue_date}T00:00:00Z`).getTime() : null;
+ const dueTime = dueDate ? new Date(`${dueDate}T00:00:00Z`).getTime() : null;
+ const calculatedDays = issueTime != null && dueTime != null ? Math.round((dueTime - issueTime) / 86400000) : null;
+ const condition = creditDays
+  ? `Crédito ${creditDays[1]} días`
+  : calculatedDays > 0 && calculatedDays <= 365 ? `Crédito ${calculatedDays} días` : 'Crédito';
  const payment = /cr[eé]dito/i.test(text)
-  ? { method: 'Crédito', condition: null, due_date: null, status: null }
+  ? { method: 'Crédito', condition, due_date: dueDate, status: 'Pendiente' }
   : /contado|efectivo/i.test(text)
    ? { method: 'Efectivo', condition: 'Contado', due_date: null, status: null }
    : { method: null, condition: null, due_date: null, status: null };
