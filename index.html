@@ -3,74 +3,387 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LA LIGURIA S.A. - Iniciar Sesión</title>
-    <!-- Iconos de FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Estilos del Login -->
-    <link rel="stylesheet" href="assets/css/login.css">
+    <meta name="theme-color" content="#0b2933">
     <meta name="referrer" content="no-referrer">
+
+    <title>LA LIGURIA S.A. | Acceso al inventario</title>
+
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    >
+    <link rel="stylesheet" href="assets/css/login.css">
 </head>
+
 <body>
-    <div class="login-card">
-        <!-- Encabezado Oscuro -->
-        <div class="login-header">
-            <div class="logo-container">
-                <img src="img/logo.png" alt="La Liguria Logo" class="logo-img">
+    <main class="login-page">
+
+        <!-- PANEL IZQUIERDO: IDENTIDAD CORPORATIVA -->
+        <section
+            class="brand-panel"
+            aria-label="Sistema de inventario La Liguria"
+        >
+            <div class="brand-panel__glow brand-panel__glow--one"
+                 aria-hidden="true"></div>
+
+            <div class="brand-panel__glow brand-panel__glow--two"
+                 aria-hidden="true"></div>
+
+            <div class="brand-panel__grid" aria-hidden="true"></div>
+
+            <div class="brand-content">
+
+                <div class="brand-lockup">
+                    <div class="brand-logo-wrap">
+                        <img
+                            src="img/logo.png"
+                            alt="Emblema de La Liguria"
+                            class="brand-logo"
+                        >
+                    </div>
+
+                    <div class="brand-wordmark">
+                        <span class="brand-name">LA LIGURIA S.A.</span>
+                        <span class="brand-subtitle">
+                            Sistema de gestión de inventario
+                        </span>
+                    </div>
+                </div>
+
+                <div class="brand-message">
+                    <span class="eyebrow">
+                        <span class="eyebrow-dot"></span>
+                        CONTROL EMPRESARIAL
+                    </span>
+
+                    <h1>
+                        Control inteligente<br>
+                        <span>de inventario.</span>
+                    </h1>
+
+                    <p>
+                        Existencias, movimientos y trazabilidad para
+                        mantener cada sede bajo control.
+                    </p>
+                </div>
+
+                <!-- ILUSTRACIÓN TECNOLÓGICA -->
+                <div class="inventory-visual" aria-hidden="true">
+                    <div class="visual-orbit visual-orbit--one"></div>
+                    <div class="visual-orbit visual-orbit--two"></div>
+
+                    <div class="visual-node visual-node--warehouse">
+                        <i class="fa-solid fa-warehouse"></i>
+                    </div>
+
+                    <div class="visual-node visual-node--boxes">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </div>
+
+                    <div class="visual-node visual-node--truck">
+                        <i class="fa-solid fa-truck-fast"></i>
+                    </div>
+
+                    <div class="visual-bar visual-bar--one"></div>
+                    <div class="visual-bar visual-bar--two"></div>
+                    <div class="visual-bar visual-bar--three"></div>
+
+                    <div class="visual-caption">
+                        <span class="caption-pulse"></span>
+                        INVENTARIO CENTRALIZADO
+                    </div>
+                </div>
+
+                <!-- FUNCIONES DEL SISTEMA -->
+                <div class="brand-features">
+
+                    <div class="brand-feature">
+                        <span class="feature-icon">
+                            <i class="fa-solid fa-cube"></i>
+                        </span>
+
+                        <span>
+                            <strong>Productos</strong>
+                            <small>Organizados</small>
+                        </span>
+                    </div>
+
+                    <div class="feature-divider"
+                         aria-hidden="true"></div>
+
+                    <div class="brand-feature">
+                        <span class="feature-icon">
+                            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                        </span>
+
+                        <span>
+                            <strong>Movimientos</strong>
+                            <small>Registrados</small>
+                        </span>
+                    </div>
+
+                    <div class="feature-divider"
+                         aria-hidden="true"></div>
+
+                    <div class="brand-feature">
+                        <span class="feature-icon">
+                            <i class="fa-solid fa-shield-halved"></i>
+                        </span>
+
+                        <span>
+                            <strong>Inventario</strong>
+                            <small>Bajo control</small>
+                        </span>
+                    </div>
+
+                </div>
             </div>
-            <h2>LA LIGURIA S.A.</h2>
-            <p>Inventario de La Liguria</p>
-        </div>
 
-        <!-- Cuerpo del Formulario -->
-        <div class="login-body">
-            <!-- Indicador de Estado / Alerta -->
-            <div class="login-steps" aria-label="Progreso del acceso"><span class="login-step active" id="step-credentials"><i class="fa-solid fa-1"></i><span>Credenciales</span></span><span class="login-step" id="step-otp"><i class="fa-solid fa-2"></i><span>Código OTP</span></span></div>
-            <div id="status-badge" class="status-badge neutral" role="status" aria-live="polite">
-                Ingresa con tu cuenta de la empresa.
+            <div class="brand-bottom-line" aria-hidden="true"></div>
+        </section>
+
+
+        <!-- PANEL DERECHO: FORMULARIO DE ACCESO -->
+        <section class="form-panel" aria-labelledby="login-title">
+
+            <div class="form-panel__inner">
+
+                <!-- MARCA VISIBLE EN MÓVILES -->
+                <div class="mobile-brand">
+                    <img
+                        src="img/logo.png"
+                        alt="Emblema de La Liguria"
+                        class="mobile-brand__logo"
+                    >
+
+                    <span>LA LIGURIA S.A.</span>
+                </div>
+
+                <header class="form-heading">
+                    <span class="form-kicker">PORTAL CORPORATIVO</span>
+
+                    <h2 id="login-title">Bienvenido de nuevo</h2>
+
+                    <p>
+                        Accede a tu cuenta para gestionar el inventario.
+                    </p>
+                </header>
+
+
+                <!-- INDICADOR DE CREDENCIALES Y OTP -->
+                <div class="login-steps" aria-label="Progreso del acceso">
+
+                    <span
+                        class="login-step active"
+                        id="step-credentials"
+                    >
+                        <i class="fa-solid fa-1" aria-hidden="true"></i>
+                        <span>Credenciales</span>
+                    </span>
+
+                    <span
+                        class="steps-connector"
+                        aria-hidden="true"
+                    ></span>
+
+                    <span class="login-step" id="step-otp">
+                        <i class="fa-solid fa-2" aria-hidden="true"></i>
+                        <span>Código OTP</span>
+                    </span>
+
+                </div>
+
+
+                <!-- MENSAJES DE ESTADO -->
+                <div
+                    id="status-badge"
+                    class="status-badge neutral"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <i
+                        class="fa-solid fa-circle-info status-icon"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span>Ingresa con tu cuenta de la empresa.</span>
+                </div>
+
+
+                <!-- FORMULARIO PRINCIPAL -->
+                <form id="form-login" novalidate>
+
+                    <!-- PASO 1: CREDENCIALES -->
+                    <div id="credentials-step">
+
+                        <div class="form-group">
+                            <label for="email">Correo electrónico</label>
+
+                            <div class="input-icon-wrapper">
+                                <i
+                                    class="fa-regular fa-envelope input-icon"
+                                    aria-hidden="true"
+                                ></i>
+
+                                <input
+                                    type="email"
+                                    id="email"
+                                    name="email"
+                                    autocomplete="username"
+                                    placeholder="nombre@empresa.com"
+                                    required
+                                >
+                            </div>
+                        </div>
+
+
+                        <div class="form-group">
+                            <label for="password">Contraseña</label>
+
+                            <div class="input-icon-wrapper">
+                                <i
+                                    class="fa-solid fa-lock input-icon"
+                                    aria-hidden="true"
+                                ></i>
+
+                                <input
+                                    type="password"
+                                    id="password"
+                                    name="password"
+                                    autocomplete="current-password"
+                                    placeholder="Ingresa tu contraseña"
+                                    required
+                                >
+
+                                <button
+                                    type="button"
+                                    class="toggle-password"
+                                    id="togglePassword"
+                                    aria-label="Mostrar contraseña"
+                                    aria-pressed="false"
+                                >
+                                    <i
+                                        class="fa-regular fa-eye"
+                                        aria-hidden="true"
+                                    ></i>
+                                </button>
+                            </div>
+
+                            <div class="form-options">
+                                <span class="secure-note">
+                                    <i
+                                        class="fa-solid fa-shield-halved"
+                                        aria-hidden="true"
+                                    ></i>
+                                    Acceso seguro
+                                </span>
+
+                                <button
+                                    type="button"
+                                    id="btn-recover"
+                                    class="btn-link"
+                                >
+                                    Olvidé mi contraseña
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+
+                    <!-- PASO 2: VERIFICACIÓN OTP -->
+                    <div id="otp-step" hidden>
+
+                        <p id="otp-help" class="otp-help">
+                            Enviamos un código de 6 dígitos a tu correo.
+                            Es válido por unos minutos.
+                        </p>
+
+                        <div class="form-group">
+                            <label for="otp">Código de verificación</label>
+
+                            <div class="input-icon-wrapper otp-input-wrapper">
+                                <i
+                                    class="fa-solid fa-shield-halved input-icon"
+                                    aria-hidden="true"
+                                ></i>
+
+                                <input
+                                    type="text"
+                                    id="otp"
+                                    name="otp"
+                                    inputmode="numeric"
+                                    autocomplete="one-time-code"
+                                    pattern="[0-9]{6}"
+                                    minlength="6"
+                                    maxlength="6"
+                                    placeholder="000000"
+                                    aria-describedby="otp-help"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="otp-actions">
+                            <button
+                                type="button"
+                                id="btn-back"
+                                class="btn-link"
+                            >
+                                Volver y cambiar correo
+                            </button>
+
+                            <button
+                                type="button"
+                                id="btn-resend"
+                                class="btn-link"
+                            >
+                                Reenviar código
+                            </button>
+                        </div>
+
+                    </div>
+
+
+                    <!-- BOTÓN PRINCIPAL -->
+                    <button
+                        type="submit"
+                        id="btn-login"
+                        class="btn-submit"
+                    >
+                        <span>Iniciar sesión</span>
+                        <i
+                            class="fa-solid fa-arrow-right"
+                            aria-hidden="true"
+                        ></i>
+                    </button>
+
+                </form>
+
+
+                <div class="form-security">
+                    <i
+                        class="fa-solid fa-lock"
+                        aria-hidden="true"
+                    ></i>
+
+                    <span>
+                        Tu acceso está protegido por verificación de identidad.
+                    </span>
+                </div>
+
+
+                <footer class="login-footer">
+                    <span>© 2026 La Liguria S.A.</span>
+                    <span class="footer-separator">•</span>
+                    <span>Todos los derechos reservados</span>
+                </footer>
+
             </div>
+        </section>
 
-            <form id="form-login">
-                <div id="credentials-step">
-                <div class="form-group">
-                    <label for="email">Correo Electrónico</label>
-                    <div class="input-icon-wrapper">
-                        <i class="fa-regular fa-envelope input-icon"></i>
-                        <input type="email" id="email" name="email" autocomplete="username" placeholder="Ingrese su correo electrónico" required>
-                    </div>
-                </div>
+    </main>
 
-                <div class="form-group">
-                    <label for="password">Contraseña</label>
-                    <div class="input-icon-wrapper">
-                        <i class="fa-solid fa-lock input-icon"></i>
-                        <input type="password" id="password" name="password" autocomplete="current-password" placeholder="••••••••" required>
-                        <button type="button" class="toggle-password" id="togglePassword" aria-label="Mostrar contraseña" aria-pressed="false"><i class="fa-regular fa-eye" aria-hidden="true"></i></button>
-                    </div>
-                <button type="button" id="btn-recover" class="btn-link">Olvidé mi contraseña</button>
-                </div>
-                </div>
-                <div id="otp-step" hidden>
-                    <p id="otp-help" class="otp-help">Enviamos un código de 6 dígitos a tu correo. Es válido por unos minutos.</p>
-                    <div class="form-group">
-                        <label for="otp">Código de verificación</label>
-                        <input type="text" id="otp" name="otp" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="000000" aria-describedby="otp-help">
-                    </div>
-                    <button type="button" id="btn-back" class="btn-link">Volver y cambiar correo</button>
-                    <button type="button" id="btn-resend" class="btn-link">Reenviar código</button>
-                </div>
-
-                <button type="submit" id="btn-login" class="btn-submit">
-                    <i class="fa-solid fa-right-to-bracket"></i> Iniciar Sesión
-                </button>
-            </form>
-            <noscript>Necesitas activar JavaScript para iniciar sesión.</noscript>
-
-            <footer class="login-footer">
-                <p>© 2026 LA LIGURIA S.A. Todos los derechos reservados.</p>
-            </footer>
-        </div>
-    </div>
-
+    <!-- Se conserva el controlador de autenticación existente -->
     <script type="module" src="js/auth.js"></script>
 </body>
 </html>
