@@ -1,7 +1,14 @@
 export function setStatus(message, tone = 'neutral') {
     const element = document.getElementById('status-badge');
     element.className = `status-badge ${tone}`;
-    element.textContent = message;
+    const icon = tone === 'danger' ? 'fa-circle-exclamation' : tone === 'success' ? 'fa-circle-check' : 'fa-circle-info';
+    element.replaceChildren();
+    const symbol = document.createElement('i');
+    symbol.className = `fa-solid ${icon} status-icon`;
+    symbol.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('span');
+    text.textContent = message;
+    element.append(symbol, text);
 }
 export function setupPasswordToggle() {
     const button = document.getElementById('togglePassword');
