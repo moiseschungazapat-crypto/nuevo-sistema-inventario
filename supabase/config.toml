@@ -1,0 +1,3 @@
+# Authentication is verified inside the function using auth.getUser and app_mi_acceso.
+[functions.exportar-google-sheets]
+verify_jwt = false

@@ -20,7 +20,7 @@ export async function startPage(section, pageOptions = {}) {
   else if(section==='usuarios')page=await usersPage(root,access);
   else if(section==='auditoria')page=await auditPage(root,access);
   else if(section==='recepciones')page=await receptionsPage(root,access);
-  else page=await overviewPage(root);
+  else page=await overviewPage(root,access);
   if(page.tables.length)watchTables(page.tables,page.refresh);
   else document.getElementById('sync-state').textContent='Sesión validada';
  }catch(error){

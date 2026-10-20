@@ -41,6 +41,12 @@ class Query{
  }
 }
 export const supabase={
+ functions:{async invoke(name){
+  if(name!=='exportar-google-sheets')throw new Error('Función de prueba desconocida.');
+  localStorage.setItem('test-sheets-calls',String(Number(localStorage.getItem('test-sheets-calls')||0)+1));
+  if(localStorage.getItem('test-sheets-error'))return {data:null,error:{context:Response.json({error:'Falta conectar la cuenta de Google.'},{status:503})}};
+  return {data:{title:'20/10/2026',updatedAt:'2026-10-20T18:30:00Z'},error:null};
+ }},
  from(table){return new Query(table);},
  auth:{
   async getUser(){return {data:{user:{id:uid}},error:null};},

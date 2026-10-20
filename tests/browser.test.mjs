@@ -80,6 +80,22 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    const download=page.waitForEvent('download');await page.locator('#export-movements').click();
    assert.equal((await download).suggestedFilename(),'movimientos.csv');
   });
+  await t.test('Dashboard confirma el envío manual a Google Sheets e informa éxito o configuración pendiente',async()=>{
+   await page.goto(base+'/dashboard.html');
+   await page.locator('#update-google-sheets').click();
+   await page.locator('[data-confirm-no]').click();
+   assert.equal(await page.evaluate(()=>localStorage.getItem('test-sheets-calls')),null);
+   await page.locator('#update-google-sheets').click();
+   await page.locator('[data-confirm-yes]').click();
+   await page.waitForFunction(()=>document.querySelector('#google-sheets-status').textContent.includes('actualizada'));
+   assert.equal(await page.evaluate(()=>localStorage.getItem('test-sheets-calls')),'1');
+   await page.evaluate(()=>localStorage.setItem('test-sheets-error','1'));
+   await page.locator('#update-google-sheets').click();await page.locator('[data-confirm-yes]').click();
+   await page.waitForFunction(()=>document.querySelector('#google-sheets-status').textContent.includes('Falta conectar'));
+   assert.equal(await page.locator('#update-google-sheets').isEnabled(),true);
+   await page.evaluate(()=>localStorage.removeItem('test-sheets-error'));
+   await page.screenshot({path:resolve(root,'test-results/dashboard-google-sheets.png'),fullPage:true});
+  });
   await t.test('dashboard y móvil mantienen contenido accesible',async()=>{
    await page.goto(base+'/dashboard.html');await page.locator('.activity-column').first().waitFor();
    await page.evaluate(()=>localStorage.removeItem('liguria-theme'));await page.reload();await page.locator('.activity-column').first().waitFor();
@@ -95,6 +111,14 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    await page.locator('.sidebar-overlay').click({position:{x:360,y:600}});
    await page.screenshot({path:resolve(root,'test-results/inventario-mobile.png'),fullPage:true});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
+  });
+  await t.test('la exportación a Google Sheets no aparece para el rol consulta',async()=>{
+   await page.evaluate(()=>{
+    const data=JSON.parse(localStorage.getItem('browser-test-database'));
+    data.auth_perfiles[0].rol='consulta';localStorage.setItem('browser-test-database',JSON.stringify(data));
+   });
+   await page.goto(base+'/dashboard.html');await page.locator('.activity-column').first().waitFor();
+   assert.equal(await page.locator('#update-google-sheets').count(),0);
   });
   assert.deepEqual(errors,[]);
  }finally{await browser?.close();await new Promise(done=>server.close(done));}
