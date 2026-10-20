@@ -48,7 +48,7 @@ export async function catalogPage(root, section, access) {
    field('es_perecible','Es perecible',{choices:`<option value="false" ${record.es_perecible?'':'selected'}>No</option><option value="true" ${record.es_perecible?'selected':''}>Sí</option>`}),
    field('requiere_lote','Requiere lote',{choices:`<option value="true" ${record.controla_inventario!==false?'selected':''}>Sí</option><option value="false" ${record.controla_inventario===false?'selected':''}>No</option>`,help:'Los artículos de stock usan lotes para conservar trazabilidad; los servicios no.'}));
   controls.push(field('estado','Estado',{choices:`<option value="true" ${record.estado!==false?'selected':''}>Activo</option><option value="false" ${record.estado===false?'selected':''}>Inactivo</option>`}));
-  openEditor({title:(original?'Editar ':'Nueva ficha de ')+config.singular,fields:controls.join(''),save:async values=>{
+  openEditor({confirmEdit: Boolean(original), title:(original?'Editar ':'Nueva ficha de ')+config.singular,fields:controls.join(''),save:async values=>{
    for(const key of Object.keys(values)) values[key]=values[key].trim();
    if(!values.nombre || (section==='productos'&&!values.codigo)) throw new Error('Completa los campos obligatorios.');
    values.estado=values.estado==='true';
@@ -148,7 +148,7 @@ export async function catalogHubPage(root, access, initialView = 'categorias') {
    field('requiere_lote','Requiere lote',{choices:'<option value="true" ' + (record.controla_inventario !== false ? 'selected' : '') + '>Sí</option><option value="false" ' + (record.controla_inventario === false ? 'selected' : '') + '>No</option>',help:'Los artículos de stock usan lotes para conservar trazabilidad; los servicios no.'})
   );
   controls.push(field('estado','Estado',{choices:'<option value="true" ' + (record.estado !== false ? 'selected' : '') + '>Activo</option><option value="false" ' + (record.estado === false ? 'selected' : '') + '>Inactivo</option>'}));
-  openEditor({title:(original ? 'Editar ' : 'Nueva ficha de ') + config.singular,fields:controls.join(''),save:async values => {
+  openEditor({confirmEdit: Boolean(original), title:(original ? 'Editar ' : 'Nueva ficha de ') + config.singular,fields:controls.join(''),save:async values => {
    for (const key of Object.keys(values)) values[key] = values[key].trim();
    if (!values.nombre || (section === 'productos' && !values.codigo)) throw new Error('Completa los campos obligatorios.');
    values.estado = values.estado === 'true';

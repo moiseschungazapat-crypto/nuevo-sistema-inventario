@@ -32,33 +32,33 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    for(const section of ['dashboard','productos','categorias','proveedores','sedes','inventario','movimientos','reportes','usuarios']){
     await page.goto(base+'/'+section+'.html');
     await page.locator('#sync-state.connected').waitFor();
-    assert.equal(await page.locator('.sidebar-menu a').count(),11);
-    assert.equal(await page.locator('.menu-item.active').getAttribute('href'),section+'.html');
+    assert.equal(await page.locator('.sidebar-menu a').count(),10);
+    assert.equal(await page.locator('.menu-item.active').getAttribute('href'),(['productos','categorias'].includes(section)?'catalogo':section)+'.html');
     assert.equal(await page.locator('#load-error:visible').count(),0);
    }
   });
   await t.test('categorías guarda y actualiza datos',async()=>{
-   await page.goto(base+'/categorias.html');await page.locator('#new-record').click();
+   await page.goto(base+'/categorias.html');await page.locator('#new-category').click();
    await page.locator('[name=nombre]').fill('Empaques');
    await page.locator('[name=descripcion]').fill('Cajas y bolsas');
-   await page.locator('#save-editor').click();await page.locator('#editor').waitFor({state:'hidden'});
-   assert.match(await page.locator('#results').innerText(),/Empaques/);
-   await page.locator('tr').filter({hasText:'Empaques'}).getByRole('button',{name:'Editar'}).click();
-   await page.locator('[name=nombre]').fill('Empaques nuevos');await page.locator('#save-editor').click();
+   await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();await page.locator('#editor').waitFor({state:'hidden'});
+   assert.match(await page.locator('#catalog-view').innerText(),/Empaques/);
+   await page.locator('tr').filter({hasText:'Empaques'}).getByRole('button',{name:'Editar'}).click();await page.locator('[data-confirm-yes]').click();
+   await page.locator('[name=nombre]').fill('Empaques nuevos');await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();
    await page.locator('#editor').waitFor({state:'hidden'});
-   assert.match(await page.locator('#results').innerText(),/Empaques nuevos/);
+   assert.match(await page.locator('#catalog-view').innerText(),/Empaques nuevos/);
   });
   await t.test('cambios en otra pestaña se actualizan sin perder el formulario abierto',async()=>{
-   await page.locator('#new-record').click();await page.locator('[name=nombre]').fill('Borrador sin guardar');
-   const other=await context.newPage();await other.goto(base+'/categorias.html');await other.locator('#new-record').click();
-   await other.locator('[name=nombre]').fill('Desde otra pestaña');await other.locator('#save-editor').click();await other.locator('#editor').waitFor({state:'hidden'});
-   await page.waitForFunction(()=>document.querySelector('#results').textContent.includes('Desde otra pestaña'));
-   assert.equal(await page.locator('[name=nombre]').inputValue(),'Borrador sin guardar');await page.locator('#cancel-editor').click();await other.close();
+   await page.locator('#new-category').click();await page.locator('[name=nombre]').fill('Borrador sin guardar');
+   const other=await context.newPage();await other.goto(base+'/categorias.html');await other.locator('#new-category').click();
+   await other.locator('[name=nombre]').fill('Desde otra pestaña');await other.locator('#save-editor').click();await other.locator('[data-confirm-yes]').click();await other.locator('#editor').waitFor({state:'hidden'});
+   await page.waitForFunction(()=>document.querySelector('#catalog-view').textContent.includes('Desde otra pestaña'));
+   assert.equal(await page.locator('[name=nombre]').inputValue(),'Borrador sin guardar');await page.locator('#cancel-editor').click();await page.locator('[data-confirm-yes]').click();await other.close();
   });
   await t.test('inventario crea lotes con vencimiento',async()=>{
    await page.goto(base+'/inventario.html');await page.locator('#new-lot').click();
    await page.locator('[name=producto_id]').selectOption('p1');await page.locator('[name=codigo]').fill('LOTE-NUEVO');
-   await page.locator('[name=vencimiento]').fill('2099-12-31');await page.locator('#save-editor').click();
+   await page.locator('[name=vencimiento]').fill('2099-12-31');await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();
    await page.locator('#editor').waitFor({state:'hidden'});
    assert.match(await page.locator('#lots').innerText(),/LOTE-NUEVO/);
    await page.screenshot({path:resolve(root,'test-results/inventario-desktop.png'),fullPage:true});
@@ -66,12 +66,12 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
   await t.test('respuesta perdida permite reintentar sin duplicar el movimiento',async()=>{
    await page.goto(base+'/movimientos.html');await page.locator('#new-movement').click();
    await page.locator('[name=producto_id]').selectOption('p1');await page.locator('[name=lote_id]').selectOption('l1');
-   await page.locator('[name=sede_id]').selectOption('s1');await page.locator('[name=cantidad]').fill('3');
+   await page.locator('[name=cantidad]').fill('3');
    await page.locator('[name=motivo]').fill('Recepción de compra');
-   await page.evaluate(()=>localStorage.setItem('test-network-failure','once'));await page.locator('#save-editor').click();
+   await page.evaluate(()=>localStorage.setItem('test-network-failure','once'));await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();
    await page.waitForFunction(()=>document.querySelector('#editor-error').textContent.includes('reintentar'));
    assert.equal(await page.locator('[name=cantidad]').isDisabled(),true);
-   await page.locator('#save-editor').click();await page.locator('#editor').waitFor({state:'hidden'});
+   await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();await page.locator('#editor').waitFor({state:'hidden'});
    assert.equal(await page.locator('#results tbody tr').count(),1);
    assert.match(await page.locator('#results').innerText(),/Recepción de compra/);
   });

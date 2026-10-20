@@ -18,7 +18,7 @@ export async function usersPage(root,access){
  async function refresh(){try{rows=await rpc('app_listar_usuarios');loadError(null);render();}catch(error){loadError(error);}}
  function edit(original){
   const row=original||{};
-  openEditor({title:original?'Editar acceso':'Habilitar cuenta existente',fields:field('email','Correo de Authentication',{type:'email',required:true,value:row.email||''})+field('nombre','Nombre',{required:true,value:row.nombre||'',maxLength:150})+
+  openEditor({confirmEdit: Boolean(original), title:original?'Editar acceso':'Habilitar cuenta existente',fields:field('email','Correo de Authentication',{type:'email',required:true,value:row.email||''})+field('nombre','Nombre',{required:true,value:row.nombre||'',maxLength:150})+
    field('rol','Rol',{choices:options([{id:'consulta',nombre:'Consulta: solo lectura'},{id:'operador',nombre:'Operador: catálogos y movimientos'},{id:'administrador',nombre:'Administrador: usuarios y ajustes'}],row.rol||'consulta','Seleccionar rol'),required:true})+
    field('activo','Acceso',{choices:'<option value="true" '+(row.activo!==false?'selected':'')+'>Habilitado</option><option value="false" '+(row.activo===false?'selected':'')+'>Inactivo</option>'}),
    setup(form){if(original)form.elements.email.readOnly=true;},

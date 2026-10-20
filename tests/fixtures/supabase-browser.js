@@ -5,7 +5,7 @@ const initial={
  auth_perfiles:[{user_id:uid,nombre:'Ana Administradora',activo:true,rol:'administrador'}],
  categorias:[{id:'c1',nombre:'Insumos',descripcion:'Materias primas',estado:true,version:1}],
  proveedores:[{id:'pr1',nombre:'Molino del Norte',contacto:'María',telefono:'999111222',email:'ventas@example.test',estado:true,version:1}],
- sedes:[{id:'s1',nombre:'Almacén Central',direccion:'Av. Industrial 120',estado:true,version:1},{id:'s2',nombre:'Sede Norte',estado:true,version:1}],
+ sedes:[{id:'s1',nombre:'La Liguria S.A.',direccion:'Av. Arica 281',estado:true,version:1},{id:'s2',nombre:'Sede Norte',estado:true,version:1}],
  productos:[{id:'p1',codigo:'HAR-001',nombre:'Harina de trigo',unidad_medida:'kg',precio:4.5,categoria_id:'c1',estado:true,version:1}],
  lotes:[{id:'l1',producto_id:'p1',codigo:'HAR-2026-09',vencimiento:'2099-10-20'}],
  inventario:[{id:'i1',producto_id:'p1',sede_id:'s1',lote_id:'l1',cantidad:25}],

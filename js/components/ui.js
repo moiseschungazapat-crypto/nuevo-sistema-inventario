@@ -1,5 +1,6 @@
 import { escapeHtml as e } from '../utils/html.js';
 import { message } from '../services/data.js';
+import { confirmAction } from './confirmation.js';
 export { e };
 export function notice(text, error = false) {
  const node = document.getElementById('notice'); node.textContent = text;
@@ -27,21 +28,31 @@ export function field(name, label, { value='', type='text', required=false, choi
  else input = `<input name="${name}" type="${type}" value="${e(value)}" ${required?'required':''} ${min!==undefined?'min="'+min+'"':''} ${step?'step="'+step+'"':''} maxlength="${maxLength}">`;
  return `<label class="field">${e(label)}${input}${help?'<small>'+e(help)+'</small>':''}</label>`;
 }
-export function openEditor({title, fields, save, setup}) {
+export async function openEditor({title, fields, save, setup, confirmEdit = false}) {
+ if (confirmEdit && !await confirmAction({title:'Confirmar edición', message:'¿Estás seguro de que quieres editar este registro?'})) return;
  const dialog = document.getElementById('editor'), form = document.getElementById('editor-form');
  document.getElementById('editor-title').textContent = title;
  document.getElementById('editor-fields').innerHTML = fields;
  const error = document.getElementById('editor-error'); error.textContent = '';
  const button = document.getElementById('save-editor'); button.disabled = false; button.textContent = 'Guardar';
  let busy = false;
- const close = () => { if (!busy) dialog.close(); };
+ let confirming = false;
+ const close = async () => {
+  if (busy || confirming) return;
+  confirming = true;
+  try {
+   if (await confirmAction({title:'Cancelar edición', message:'¿Estás seguro de que quieres cancelar? Se perderán los cambios sin guardar.'})) dialog.close();
+  } finally { confirming = false; }
+ };
  document.getElementById('close-editor').onclick = close;
  document.getElementById('cancel-editor').onclick = close;
- dialog.oncancel = event => { if (busy) event.preventDefault(); };
+ dialog.oncancel = event => { event.preventDefault(); close(); };
  form.onsubmit = async event => {
-  event.preventDefault(); if (busy || !form.reportValidity()) return;
-  busy = true; button.disabled = true; button.textContent = 'Guardando…'; error.textContent = '';
+  event.preventDefault(); if (busy || confirming || !form.reportValidity()) return;
+  busy = true; button.disabled = true;
   try {
+   if (!await confirmAction({title:'Confirmar guardado', message:'¿Estás seguro de que quieres guardar estos datos?'})) return;
+   button.textContent = 'Guardando…'; error.textContent = '';
    const values = Object.fromEntries(new FormData(form));
    // Keep the native form available to flows that need files (FileList is not
    // preserved by Object.fromEntries). It is non-enumerable so callers can

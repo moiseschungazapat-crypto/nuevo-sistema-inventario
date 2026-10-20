@@ -3,6 +3,7 @@ import { supabase } from '../supabase.js';
 import { heading, e, table, field, options, openEditor, notice, loadError } from '../components/ui.js';
 import { operationalSite, operationalSiteError, operationalSiteLabel } from '../utils/single-site.js';
 import { analyzeInvoiceLocally } from '../services/local-ocr.js';
+import { confirmAction } from '../components/confirmation.js';
 
 const nullableNumber = value => value === '' || value == null ? null : Number(value);
 const productLabel = product => `${product.codigo || 'Sin código'} · ${product.nombre}`;
@@ -43,6 +44,7 @@ export async function receptionsPage(root, access) {
    document.getElementById('save-editor').hidden=true;
    document.getElementById('cancel-editor').textContent='Cerrar';
    const close=()=>{dialog.close();document.getElementById('save-editor').hidden=false;document.getElementById('cancel-editor').textContent='Cancelar';};
+   dialog.oncancel=event=>{event.preventDefault();close();};
    document.getElementById('close-editor').onclick=close;document.getElementById('cancel-editor').onclick=close;dialog.showModal();
   }catch(error){notice(error.message||'No se pudieron abrir los archivos.',true);}
  }
@@ -207,7 +209,10 @@ export async function receptionsPage(root, access) {
     form.__addReceptionLine=()=>{if(next>=50){notice('Se alcanzó el máximo de 50 productos por recepción.',true);return null;}list.insertAdjacentHTML('beforeend',line(next));syncLine(list.lastElementChild);next++;return list.lastElementChild;};
     form.querySelector('#add-reception-line').onclick=form.__addReceptionLine;
     form.querySelector('#analyze-reception-invoice').onclick=()=>analyzeInvoice(form);
-    list.onclick=event=>{const button=event.target.closest('[data-remove-line]');if(button)button.closest('[data-reception-line]').remove();};
+    list.onclick=async event=>{
+     const button=event.target.closest('[data-remove-line]');
+     if(button && await confirmAction({title:'Quitar producto',message:'¿Estás seguro de que quieres quitar este producto de la recepción?',danger:true})) button.closest('[data-reception-line]').remove();
+    };
    },
    save:async values=>{
     const detalles=[];
