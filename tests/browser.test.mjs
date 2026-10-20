@@ -63,6 +63,35 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    assert.match(await page.locator('#lots').innerText(),/LOTE-NUEVO/);
    await page.screenshot({path:resolve(root,'test-results/inventario-desktop.png'),fullPage:true});
   });
+  await t.test('inventario diario descarga todas las páginas y respeta búsqueda y filtros',async()=>{
+   await page.goto(base+'/inventario.html');await page.locator('#results tbody tr').first().waitFor();
+   const original=await page.evaluate(()=>localStorage.getItem('browser-test-database'));
+   try{
+    await page.evaluate(()=>{
+     const data=JSON.parse(localStorage.getItem('browser-test-database'));
+     const first=data.inventario[0];
+     for(let i=0;i<25;i++)data.inventario.push({...first,id:'extra-'+i});
+     localStorage.setItem('browser-test-database',JSON.stringify(data));
+    });
+    await page.locator('#refresh').click();
+    await page.waitForFunction(()=>document.querySelector('#pager').textContent.includes('26 registros'));
+    assert.equal(await page.locator('#results tbody tr').count(),20);
+    const download=page.waitForEvent('download');await page.locator('#export-daily-stock').click();
+    const file=await download;
+    assert.match(file.suggestedFilename(),/^inventario-diario-\d{4}-\d{2}-\d{2}\.xlsx$/);
+    const path=resolve(root,'test-results/inventario-diario.xlsx');await file.saveAs(path);
+    const text=(await readFile(path)).toString('utf8');
+    assert.match(text,/26 registros/);assert.match(text,/row r="32"/);
+    await page.locator('#search').fill('No existe este producto');
+    const emptyDownload=page.waitForEvent('download');await page.locator('#export-daily-stock').click();
+    await (await emptyDownload).saveAs(path);
+    assert.match((await readFile(path)).toString('utf8'),/No hay registros para los filtros seleccionados/);
+    await page.locator('#search').fill('');await page.locator('#filter').selectOption('expired');
+    const filteredDownload=page.waitForEvent('download');await page.locator('#export-daily-stock').click();
+    await (await filteredDownload).saveAs(path);
+    assert.match((await readFile(path)).toString('utf8'),/Mostrar: Vencido/);
+   }finally{await page.evaluate(value=>localStorage.setItem('browser-test-database',value),original);}
+  });
   await t.test('respuesta perdida permite reintentar sin duplicar el movimiento',async()=>{
    await page.goto(base+'/movimientos.html');await page.locator('#new-movement').click();
    await page.locator('[name=producto_id]').selectOption('p1');await page.locator('[name=lote_id]').selectOption('l1');

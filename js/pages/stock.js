@@ -1,19 +1,26 @@
 import { allRows, rpc } from '../services/data.js';
 import { heading, e, badge, table, pager, field, options, openEditor, notice, loadError } from '../components/ui.js';
-import { expiryStatus, quantity } from '../utils/domain.js';
+import { expiryStatus, quantity, todayLima } from '../utils/domain.js';
+import { downloadExcelReport } from '../utils/excel-report.js';
 import { operationalSite, operationalSiteError, operationalSiteLabel } from '../utils/single-site.js';
 export async function stockPage(root, access) {
  let stock=[],lots=[],products=[],sites=[],mainSite=null,page=0;
  const canWrite=access.rol!=='consulta';
- root.innerHTML=heading('Inventario de La Liguria','Existencias por producto y lote. Los saldos cambian únicamente con movimientos.',canWrite?'<button class="button" id="minimum">Configurar mínimo</button><button class="button" id="new-lot">+ Nuevo lote</button><a class="button primary" href="movimientos.html">Registrar movimiento</a>':'')+
+ root.innerHTML=heading('Inventario de La Liguria','Existencias por producto y lote. Los saldos cambian únicamente con movimientos.','<button class="button" id="export-daily-stock">Descargar inventario diario</button>'+(canWrite?'<button class="button" id="minimum">Configurar mínimo</button><button class="button" id="new-lot">+ Nuevo lote</button><a class="button primary" href="movimientos.html">Registrar movimiento</a>':''))+
  '<div id="stock-kpis" class="kpi-grid"></div><section class="panel"><div class="toolbar"><label class="search-label">Buscar<input id="search" type="search" placeholder="Producto, código o lote…"></label><label>Sede operativa<select id="site" disabled></select></label><label>Mostrar<select id="filter"><option value="">Todo el inventario</option><option value="low">Bajo mínimo</option><option value="expiry">Vence en 30 días</option><option value="expired">Vencido</option></select></label><button id="refresh" class="button">Actualizar</button></div><div id="results"></div><div id="pager" class="pagination"></div></section><section class="panel"><h2>Lotes registrados</h2><p class="muted">Los lotes de Inventario de La Liguria conservan su código y vencimiento para mantener la trazabilidad.</p><div id="lots"></div><p class="muted" id="lots-summary"></p></section>';
- function render(){
-  const query=root.querySelector('#search').value.toLowerCase().trim(),site=root.querySelector('#site').value,filter=root.querySelector('#filter').value;
-  const filtered=stock.filter(row=>{
-   const status=expiryStatus(row.vencimiento);
+ function currentFilters(){
+  return {query:root.querySelector('#search').value.toLowerCase().trim(),site:root.querySelector('#site').value,filter:root.querySelector('#filter').value};
+ }
+ function filterStock(rows,{query,site,filter}=currentFilters(),today=todayLima()){
+  return rows.filter(row=>{
+   const status=expiryStatus(row.vencimiento,today);
    return (!site||String(row.sede_id)===site)&&(!query||[row.producto,row.codigo,row.lote].some(v=>String(v||'').toLowerCase().includes(query)))&&
     (!filter || (filter==='low'&&Number(row.total_sede)<Number(row.stock_minimo))||(filter==='expiry'&&status.tone==='warning'&&Number(row.cantidad)>0)||(filter==='expired'&&status.tone==='danger'&&Number(row.cantidad)>0));
   });
+ }
+ function render(){
+  const {query}=currentFilters();
+  const filtered=filterStock(stock);
   page=Math.min(page,Math.max(0,Math.ceil(filtered.length/20)-1));
   const low=new Set(stock.filter(row=>Number(row.total_sede)<Number(row.stock_minimo)).map(row=>row.producto_id+':'+row.sede_id)).size;
   const exp=stock.filter(row=>Number(row.cantidad)>0&&['danger','warning'].includes(expiryStatus(row.vencimiento).tone)).length;
@@ -27,6 +34,27 @@ export async function stockPage(root, access) {
   root.querySelector('#lots').innerHTML=table(['Producto','Código de lote','Vencimiento'],displayedLots.slice(0,50).map(row=>[e(products.find(p=>String(p.id)===String(row.producto_id))?.nombre||'—'),e(row.codigo),e(row.vencimiento)]));
   root.querySelector('#lots-summary').textContent='Mostrando '+Math.min(50,displayedLots.length)+' de '+displayedLots.length+' lotes. Usa el buscador para encontrar un lote.';
  }
+ root.querySelector('#export-daily-stock').onclick=async event=>{
+  const button=event.currentTarget;if(button.disabled)return;button.disabled=true;button.textContent='Preparando Excel…';
+  try{
+   if(!mainSite)throw new Error('Actualiza el inventario antes de descargar el reporte.');
+   const selected=currentFilters();
+   const displayFilter=root.querySelector('#filter').selectedOptions[0].textContent;
+   const rows=await rpc('app_exportar_stock',{p_producto:null,p_sede:String(mainSite.id)});
+   const now=new Date(),day=todayLima();
+   const filtered=filterStock(rows,selected,day);
+   downloadExcelReport('inventario-diario-'+day+'.xlsx',{
+    title:'INVENTARIO DIARIO · '+day.split('-').reverse().join('/'),sheetName:'Inventario diario',now,
+    headers:['Código','Producto','Sede','Lote','Vencimiento','Existencias','Unidad','Total producto/sede','Mínimo producto/sede','Estado'],
+    rows:filtered.map(row=>[row.codigo,row.producto,row.sede,row.lote,row.vencimiento,row.cantidad,row.unidad_medida,row.total_sede,row.stock_minimo,expiryStatus(row.vencimiento,day).text]),
+    widths:[18,36,30,27,19,16,14,24,25,24],numericColumns:[5,7,8],dateColumns:{4:'date'},
+    filters:'Sede: '+operationalSiteLabel(mainSite)+' · Mostrar: '+displayFilter+(selected.query?' · Búsqueda: '+selected.query:''),
+    note:'Existencias al momento de la descarga. Incluye todas las páginas filtradas. Los totales y mínimos por producto/sede no se suman entre lotes.',
+   });
+   notice('Inventario diario descargado en Excel: '+filtered.length+' registros.');
+  }catch(error){notice(error.message||'No se pudo descargar el inventario diario.',true);}
+  finally{button.disabled=false;button.textContent='Descargar inventario diario';}
+ };
  async function refresh(){
   try{
    const [allStock,loadedLots,loadedProducts,allSites]=await Promise.all([allRows('app_stock'),allRows('lotes'),allRows('productos'),allRows('sedes')]);
