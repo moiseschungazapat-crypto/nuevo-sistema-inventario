@@ -76,6 +76,20 @@ test('dos creaciones simultáneas reintentan sobre la misma pestaña sin duplica
  await assert.rejects(writeReport('sheet','token',report,async()=>new Response('',{status:403})),/comparte el archivo/);
 });
 
+test('formato legible combina títulos, diferencia anchos y reemplaza las bandas de la exportación anterior',()=>{
+ const report=buildReport(sample());
+ const {requests}=reportRequests(report,{sheetId:99,bandedRanges:[{bandedRangeId:700}]});
+ assert.ok(requests.some(r=>r.deleteBanding?.bandedRangeId===700));
+ const unmerge=requests.findIndex(r=>r.unmergeCells);
+ const write=requests.findIndex(r=>r.updateCells);
+ assert.ok(unmerge>0 && unmerge<write);
+ assert.equal(requests.filter(r=>r.addBanding).length,report.tables.length);
+ assert.equal(requests[0].updateSheetProperties.properties.gridProperties.frozenRowCount,8);
+ assert.equal(requests[0].updateSheetProperties.properties.gridProperties.frozenColumnCount,0);
+ assert.ok(requests.some(r=>r.mergeCells?.range.startRowIndex===0 && r.mergeCells.range.endColumnIndex===8));
+ assert.ok(requests.some(r=>r.updateDimensionProperties?.range.dimension==='COLUMNS' && r.updateDimensionProperties.properties.pixelSize===300));
+});
+
 test('cuenta de servicio firma el acceso de Google sin enviar la clave privada',async()=>{
  const keys=await crypto.subtle.generateKey({name:'RSASSA-PKCS1-v1_5',modulusLength:2048,publicExponent:new Uint8Array([1,0,1]),hash:'SHA-256'},true,['sign','verify']);
  const privateKey=Buffer.from(await crypto.subtle.exportKey('pkcs8',keys.privateKey)).toString('base64');

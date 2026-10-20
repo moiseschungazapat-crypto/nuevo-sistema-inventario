@@ -75,10 +75,15 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    assert.equal(await page.locator('#results tbody tr').count(),1);
    assert.match(await page.locator('#results').innerText(),/Recepción de compra/);
   });
-  await t.test('reportes descargan CSV',async()=>{
+  await t.test('reportes descargan Excel con formato para movimientos y existencias',async()=>{
    await page.goto(base+'/reportes.html');
    const download=page.waitForEvent('download');await page.locator('#export-movements').click();
-   assert.equal((await download).suggestedFilename(),'movimientos.csv');
+   const movements=await download;
+   assert.equal(movements.suggestedFilename(),'movimientos.xlsx');
+   await movements.saveAs(resolve(root,'test-results/movimientos.xlsx'));
+   const stockDownload=page.waitForEvent('download');await page.locator('#export-stock').click();
+   const stock=await stockDownload;assert.equal(stock.suggestedFilename(),'existencias.xlsx');
+   await stock.saveAs(resolve(root,'test-results/existencias.xlsx'));
   });
   await t.test('Dashboard confirma el envío manual a Google Sheets e informa éxito o configuración pendiente',async()=>{
    await page.goto(base+'/dashboard.html');

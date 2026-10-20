@@ -24,7 +24,7 @@ export async function writeReport(spreadsheetId, token, report, request = fetch)
  const url = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(spreadsheetId);
  const headers = {Authorization:'Bearer '+token,'Content-Type':'application/json'};
  const list = async () => {
-  const response = await request(url+'?fields=sheets.properties',{headers,signal:AbortSignal.timeout(20000)});
+  const response = await request(url+'?fields=sheets(properties,bandedRanges(bandedRangeId))',{headers,signal:AbortSignal.timeout(20000)});
   if (!response.ok) throw new Error(response.status===403 || response.status===404
    ? 'No se pudo acceder a la hoja. Habilita Google Sheets API y comparte el archivo como Editor con la cuenta de servicio.'
    : 'No se pudo consultar Google Sheets. Vuelve a intentar.');
@@ -32,7 +32,8 @@ export async function writeReport(spreadsheetId, token, report, request = fetch)
  };
  let sheets = await list();
  for (let attempt=0;attempt<2;attempt++) {
-  const existing = sheets.find(s=>s.properties.title===report.title)?.properties;
+  const match = sheets.find(s=>s.properties.title===report.title);
+  const existing = match ? {...match.properties,bandedRanges:match.bandedRanges||[]} : undefined;
   const {sheetId,requests} = reportRequests(report,existing);
   const body = JSON.stringify({requests});
   if (new TextEncoder().encode(body).length>1900000) throw new Error('El reporte es demasiado grande para un envío. Contacta al administrador para dividirlo.');

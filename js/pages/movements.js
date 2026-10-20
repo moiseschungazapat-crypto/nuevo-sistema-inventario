@@ -1,27 +1,30 @@
 import { allRows, rpc } from '../services/data.js';
 import { movementPage } from '../services/movements.js';
 import { heading, e, badge, table, pager, field, options, openEditor, notice, loadError } from '../components/ui.js';
-import { quantity, validateMovement, csvContent } from '../utils/domain.js';
+import { quantity, validateMovement } from '../utils/domain.js';
+import { downloadExcelReport } from '../utils/excel-report.js';
 import { operationalSite, operationalSiteError, operationalSiteLabel } from '../utils/single-site.js';
 const labels={entrada:'Entrada',salida:'Salida',traslado:'Traslado',ajuste_positivo:'Ajuste (+)',ajuste_negativo:'Ajuste (−)'};
 export const movementHeaders=['Fecha (Lima)','Tipo','Producto','Lote','Sede','Destino','Cantidad','Unidad','Responsable','Documento','Motivo'];
 export function movementValues(row){return [new Date(row.fecha).toLocaleString('es-PE',{timeZone:'America/Lima'}),labels[row.tipo]||row.tipo,row.producto,row.lote,row.sede,row.destino||'—',row.cantidad,row.unidad_medida,row.responsable,row.documento||'',row.motivo];}
-export function downloadCsv(filename,headers,rows){
- const url=URL.createObjectURL(new Blob([csvContent(headers,rows)],{type:'text/csv;charset=utf-8'}));
- const link=document.createElement('a');link.href=url;link.download=filename;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-}
 export async function movementsPage(root,access,report=false){
  let products=[],sites=[],lots=[],stock=[],mainSite=null,page=0,request=0;
  const canWrite=access.rol!=='consulta';
  const pendingKey='liguria-movement-'+access.user_id;
  function readPending(){try{return JSON.parse(localStorage.getItem(pendingKey)||'null');}catch{return null;}}
  root.innerHTML=heading(report?'Reportes':'Movimientos',report?'Consulta y exporta el Inventario de La Liguria y sus movimientos. Fechas expresadas en hora de Lima.':'Historial auditable de entradas, salidas y ajustes del Inventario de La Liguria.',
- report?'<button class="button" id="export-stock">Exportar existencias</button><button class="button primary" id="export-movements">Exportar movimientos</button>':(canWrite?'<button class="button primary" id="new-movement">+ Registrar movimiento</button>':''))+
+ report?'<button class="button" id="export-stock">Existencias en Excel</button><button class="button primary" id="export-movements">Movimientos en Excel</button>':(canWrite?'<button class="button primary" id="new-movement">+ Registrar movimiento</button>':''))+
  '<section class="panel"><div class="toolbar filters"><label>Producto<select id="product"></select></label><label>Sede operativa<select id="site"></select></label><label>Tipo<select id="type"><option value="">Todos</option>'+Object.entries(labels).filter(([key])=>key!=='traslado').map(([key,label])=>'<option value="'+key+'">'+label+'</option>').join('')+'</select></label><label>Desde<input type="date" id="from"></label><label>Hasta<input type="date" id="to"></label><button id="refresh" class="button">Actualizar</button></div><div id="results"></div><div id="pager" class="pagination"></div></section>';
  function filters(){
   const values={producto:root.querySelector('#product').value,sede:root.querySelector('#site').value,tipo:root.querySelector('#type').value,desde:root.querySelector('#from').value,hasta:root.querySelector('#to').value};
   if(values.desde&&values.hasta&&values.desde>values.hasta) throw new Error('La fecha inicial debe ser anterior o igual a la fecha final.');
   return values;
+ }
+ function exportFilters(current,stockOnly=false){
+  const selected=id=>root.querySelector('#'+id).selectedOptions[0]?.textContent||'Todos';
+  const parts=['Producto: '+selected('product'),'Sede: '+selected('site')];
+  if(!stockOnly)parts.push('Tipo: '+selected('type'),'Desde: '+(current.desde||'Sin límite'),'Hasta: '+(current.hasta||'Sin límite'));
+  return parts.join(' · ');
  }
  async function refresh(){
   const token=++request;
@@ -117,8 +120,11 @@ export async function movementsPage(root,access,report=false){
   try{
    const current=filters();
    const rows=await rpc('app_exportar_movimientos',{p_producto:current.producto||null,p_sede:current.sede||null,p_tipo:current.tipo||null,p_desde:current.desde||null,p_hasta:current.hasta||null});
-   downloadCsv('movimientos.csv',movementHeaders,rows.map(movementValues));
-   notice('Reporte exportado con una lectura consistente de la base de datos.');
+   downloadExcelReport('movimientos.xlsx',{title:'REPORTE DE MOVIMIENTOS',sheetName:'Movimientos',headers:movementHeaders,
+    rows:rows.map(row=>{const values=movementValues(row);values[0]=row.fecha;return values;}),
+    widths:[23,18,34,24,29,25,14,12,28,30,44],numericColumns:[6],dateColumns:{0:'datetime'},filters:exportFilters(current),
+    note:'Fechas en hora de Perú. Las cantidades se muestran por producto y unidad; no se suman kilos, litros y unidades.'});
+   notice('Reporte de movimientos descargado en Excel con formato.');
   }catch(error){loadError(error);}finally{button.disabled=false;}
  });
  root.querySelector('#export-stock')?.addEventListener('click',async event=>{
@@ -126,7 +132,11 @@ export async function movementsPage(root,access,report=false){
   try{
    const current=filters();
    const rows=await rpc('app_exportar_stock',{p_producto:current.producto||null,p_sede:current.sede||null});
-   downloadCsv('existencias.csv',['Producto','Código','Sede','Lote','Vencimiento','Cantidad','Unidad','Mínimo producto/sede'],rows.map(r=>[r.producto,r.codigo,r.sede,r.lote,r.vencimiento,r.cantidad,r.unidad_medida,r.stock_minimo]));
+   downloadExcelReport('existencias.xlsx',{title:'REPORTE DE EXISTENCIAS',sheetName:'Existencias',
+    headers:['Producto','Código','Sede','Lote','Vencimiento','Cantidad','Unidad','Mínimo producto/sede'],
+    rows:rows.map(r=>[r.producto,r.codigo,r.sede,r.lote,r.vencimiento,r.cantidad,r.unidad_medida,r.stock_minimo]),
+    widths:[36,18,30,26,19,16,14,25],numericColumns:[5,7],dateColumns:{4:'date'},filters:exportFilters(current,true),
+    note:'Existencias actuales. Fechas y tipo no aplican. El mínimo corresponde al producto por sede y no se suma entre lotes.'});
    notice('Existencias actuales exportadas. Los filtros de fechas y tipo solo aplican a movimientos.');
   }catch(error){loadError(error);}finally{button.disabled=false;}
  });
