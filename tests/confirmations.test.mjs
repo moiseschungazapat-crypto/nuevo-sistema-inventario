@@ -68,13 +68,13 @@ test('confirmaciones protegen guardar, editar, cancelar y quitar productos', asy
   assert.match(await row.innerText(), /Proveedor de prueba/);
 
   // Every section using the shared editor must ask before discarding its form.
-  for (const [section, button] of [['catalogo','new-category'], ['inventario','new-lot'], ['movimientos','new-movement'], ['usuarios','new-user'], ['recepciones','new-reception']]) {
+  for (const [section, button] of [['catalogo','new-category'], ['recepciones','new-lot'], ['movimientos','new-movement'], ['usuarios','new-user'], ['recepciones','new-reception']]) {
    await page.goto(base + '/' + section + '.html');
    await page.locator('#' + button).click();
    await page.locator('#cancel-editor').click();
    await answer(false);
    assert.equal(await page.locator('#editor').isVisible(), true);
-   if (section === 'recepciones') {
+   if (button === 'new-reception') {
     await page.locator('#add-reception-line').click();
     assert.equal(await page.locator('[data-reception-line]').count(), 2);
     await page.locator('[data-remove-line]:visible').click();

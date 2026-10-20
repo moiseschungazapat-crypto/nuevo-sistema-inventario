@@ -60,7 +60,7 @@ export async function movementsPage(root,access,report=false){
   openEditor({title:pending?'Reintentar movimiento pendiente':'Registrar movimiento',fields:
    field('tipo','Tipo',{choices:allowed.map(([key,label])=>`<option value="${key}" ${key===movementType?'selected':''}>${label}</option>`).join('')})+
    field('producto_id','Producto',{required:true,choices:options(products.filter(p=>(p.estado||String(p.id)===data.producto_id)&&p.controla_inventario!==false),data.producto_id)})+
-   field('lote_id','Lote',{required:true,choices:'',help:'Para crear un lote, utiliza Inventario → Nuevo lote.'})+
+   field('lote_id','Lote',{required:true,choices:'',help:'Para crear un lote, utiliza Recepciones → Nuevo lote.'})+
    field('cantidad','Cantidad en la unidad base del producto',{type:'number',required:true,min:0.001,step:'0.001',value:data.cantidad||''})+
    field('documento','Documento / referencia',{value:data.documento||'',maxLength:120})+
    field('motivo','Motivo',{type:'textarea',required:true,value:data.motivo||'',maxLength:1000})+

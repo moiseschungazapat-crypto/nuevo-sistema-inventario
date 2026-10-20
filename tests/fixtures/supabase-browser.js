@@ -61,11 +61,16 @@ export const supabase={
  async rpc(name,args={}){
   const data=db();
   if(name==='app_mi_acceso')return {data:data.auth_perfiles[0],error:null};
+  if(name==='app_listar_recepciones')return {data:[],error:null};
   if(name==='app_exportar_movimientos')return {data:moves(data),error:null};
   if(name==='app_exportar_stock')return {data:stock(data),error:null};
   if(name==='app_resumen')return {data:{productos:data.productos.length,bajo_minimo:0,entradas:data.movimientos.filter(m=>m.tipo==='entrada').length,salidas:0,vencidos:0,por_vencer:0,actividad:['09','10','11','12','13','14','15'].map((day,i)=>({dia:'2026-09-'+day,total:i})),recientes:moves(data).slice(-8)},error:null};
   if(name==='app_crear_lote'){const id=crypto.randomUUID();data.lotes.push({id,producto_id:args.p_producto,codigo:args.p_codigo,vencimiento:args.p_vencimiento});save(data);return {data:id,error:null};}
-  if(name==='app_configurar_minimo')return {data:null,error:null};
+  if(name==='app_configurar_minimo'){
+   const existing=data.inventario_minimos.find(m=>String(m.producto_id)===args.p_producto&&String(m.sede_id)===args.p_sede);
+   if(existing)existing.minimo=args.p_minimo;else data.inventario_minimos.push({id:crypto.randomUUID(),producto_id:args.p_producto,sede_id:args.p_sede,minimo:args.p_minimo});
+   save(data);return {data:null,error:null};
+  }
   if(name==='app_registrar_movimiento'){
    if(data.operations[args.p_operacion])return {data:{id:data.operations[args.p_operacion],repetido:true},error:null};
    const id=crypto.randomUUID();

@@ -4,6 +4,7 @@ import { heading, e, table, field, options, openEditor, notice, loadError } from
 import { operationalSite, operationalSiteError, operationalSiteLabel } from '../utils/single-site.js';
 import { analyzeInvoiceLocally } from '../services/local-ocr.js';
 import { confirmAction } from '../components/confirmation.js';
+import { createLot } from '../components/inventory-settings.js';
 
 const nullableNumber = value => value === '' || value == null ? null : Number(value);
 const productLabel = product => `${product.codigo || 'Sin código'} · ${product.nombre}`;
@@ -231,6 +232,11 @@ export async function receptionsPage(root, access) {
     notice('Recepción guardada; las existencias solo aumentaron para productos de stock.');await refresh();
    }
   });
+ }
+ if(canWrite){
+  const button=document.createElement('button');button.type='button';button.id='new-lot';button.className='button';button.textContent='+ Nuevo lote';
+  root.querySelector('.page-heading .actions').prepend(button);
+  button.onclick=()=>createLot(products,refresh);
  }
  root.querySelector('#new-reception')?.addEventListener('click',openReception);root.querySelector('#refresh').onclick=refresh;await refresh();
  return {refresh,tables:['recepciones','recepcion_detalles','recepcion_archivos','proveedor_productos','inventario','movimientos','productos','proveedores','sedes','lotes']};

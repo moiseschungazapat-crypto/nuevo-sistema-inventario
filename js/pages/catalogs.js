@@ -1,6 +1,7 @@
 import { allRows, saveRecord } from '../services/data.js';
 import { heading, field, openEditor, options, e, badge, table, pager, notice, loadError } from '../components/ui.js';
 import { quantity } from '../utils/domain.js';
+import { configureMinimum } from '../components/inventory-settings.js';
 export const catalogConfig = {
  categorias: {title:'Categorías', singular:'categoría', description:'Organiza los productos y conserva su clasificación.', fields:[['nombre','Nombre'],['descripcion','Descripción','textarea']], columns:['Nombre','Descripción','Estado']},
  proveedores: {title:'Proveedores', singular:'proveedor', description:'Directorio de empresas y contactos de abastecimiento.', fields:[['nombre','Razón social / nombre'],['documento','RUC / documento'],['contacto','Persona de contacto'],['telefono','Teléfono','tel'],['email','Correo','email'],['direccion','Dirección']], columns:['Proveedor','Documento','Contacto','Teléfono','Correo','Estado']},
@@ -23,11 +24,12 @@ export async function catalogPage(root, section, access) {
    if(section==='proveedores') cells=[e(row.nombre),e(row.documento||'—'),e(row.contacto||'—'),e(row.telefono||'—'),e(row.email||'—'),state];
    if(section==='sedes') cells=[e(row.nombre),e(row.direccion||'—'),e(row.responsable||'—'),state];
    if(section==='productos') cells=[e(row.codigo),e(row.nombre),e(categories.find(c=>String(c.id)===String(row.categoria_id))?.nombre||'Sin categoría'),e(row.unidad_medida),e({producto:'Producto',servicio:'Servicio',activo:'Activo',gasto:'Gasto'}[row.tipo_item]||'Producto'),row.controla_inventario===false?badge('No genera stock','neutral'):badge('Sí','success'),row.precio_confirmado&&Number(row.precio)>0?'S/ '+quantity(row.precio):'Sin dato',state];
-   if(canWrite) cells.push(`<button class="button small" data-edit="${e(row.id)}">Editar</button>`);
+   if(canWrite) cells.push(`<button class="button small" data-edit="${e(row.id)}">Editar</button>`+(section==='productos'&&row.controla_inventario!==false?` <button class="button small" data-minimum="${e(row.id)}">Stock mínimo</button>`:''));
    return cells;
   });
   root.querySelector('#results').innerHTML=table([...config.columns,...(canWrite?['Acciones']:[])],content);
   root.querySelectorAll('[data-edit]').forEach(btn=>btn.onclick=()=>edit(rows.find(row=>String(row.id)===btn.dataset.edit)));
+  root.querySelectorAll('[data-minimum]').forEach(btn=>btn.onclick=()=>configureMinimum(rows.find(row=>String(row.id)===btn.dataset.minimum)));
   pager(root.querySelector('#pager'),filtered.length,page,20,value=>{page=value;render();});
  }
  async function refresh() {
@@ -98,7 +100,7 @@ export async function catalogHubPage(root, access, initialView = 'categorias') {
   page = Math.min(page, Math.max(0, Math.ceil(filtered.length / 20) - 1));
   const content = filtered.slice(page * 20, (page + 1) * 20).map(row => {
    const cells = [e(row.codigo),e(row.nombre),e(categoryName(row.categoria_id)),e(row.unidad_medida),e({producto:'Producto',servicio:'Servicio',activo:'Activo',gasto:'Gasto'}[row.tipo_item] || 'Producto'),row.controla_inventario === false ? badge('No genera stock','neutral') : badge('Sí','success'),row.precio_confirmado && Number(row.precio) > 0 ? 'S/ ' + quantity(row.precio) : 'Sin dato',badge(row.estado ? 'Activo' : 'Inactivo',row.estado ? 'success' : 'neutral')];
-   if (canWrite) cells.push('<button type="button" class="button small" data-edit-product="' + e(row.id) + '">Editar</button>');
+   if (canWrite) cells.push('<button type="button" class="button small" data-edit-product="' + e(row.id) + '">Editar</button>'+(row.controla_inventario!==false?' <button type="button" class="button small" data-minimum="'+e(row.id)+'">Stock mínimo</button>':''));
    return cells;
   });
   const context = selectedCategory ? '<div class="catalog-view-header"><div><h2>Productos · ' + e(categoryName(selectedCategory)) + '</h2><p class="muted">Productos asociados a esta categoría.</p></div><button type="button" class="button" id="back-categories">← Volver a categorías</button></div>' : '<div class="catalog-view-header"><div><h2>Productos</h2><p class="muted">Catálogo de artículos y servicios registrados.</p></div></div>';
@@ -122,6 +124,7 @@ export async function catalogHubPage(root, access, initialView = 'categorias') {
   root.querySelector('#new-product')?.addEventListener('click',() => edit('productos'));
   root.querySelectorAll('[data-edit-category]').forEach(button => button.onclick = () => edit('categorias',categories.find(row => String(row.id) === button.dataset.editCategory)));
   root.querySelectorAll('[data-edit-product]').forEach(button => button.onclick = () => edit('productos',products.find(row => String(row.id) === button.dataset.editProduct)));
+  root.querySelectorAll('[data-minimum]').forEach(button=>button.onclick=()=>configureMinimum(products.find(row=>String(row.id)===button.dataset.minimum)));
   root.querySelectorAll('[data-view-products]').forEach(button => button.onclick = () => { view = 'productos'; selectedCategory = button.dataset.viewProducts; state.search = ''; page = 0; bindView(); });
   const visibleRows = (view === 'categorias' ? categories : products).filter(row => {
    if (view === 'categorias') return (state.status === '' || String(row.estado) === state.status) && String(row.nombre || '').toLocaleLowerCase().includes(state.search);

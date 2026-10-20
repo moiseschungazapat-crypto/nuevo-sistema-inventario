@@ -55,12 +55,31 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    await page.waitForFunction(()=>document.querySelector('#catalog-view').textContent.includes('Desde otra pestaña'));
    assert.equal(await page.locator('[name=nombre]').inputValue(),'Borrador sin guardar');await page.locator('#cancel-editor').click();await page.locator('[data-confirm-yes]').click();await other.close();
   });
-  await t.test('inventario crea lotes con vencimiento',async()=>{
-   await page.goto(base+'/inventario.html');await page.locator('#new-lot').click();
+  await t.test('Catálogo configura mínimos y los cambios aparecen en Inventario',async()=>{
+   await page.goto(base+'/productos.html');await page.locator('[data-minimum="p1"]').click();
+   assert.equal(await page.locator('[name=minimo]').inputValue(),'10');
+   await page.locator('[name=minimo]').fill('30');await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();
+   await page.locator('#editor').waitFor({state:'hidden'});
+   await page.goto(base+'/inventario.html');await page.locator('[data-stock-detail]').first().waitFor();
+   assert.match(await page.locator('#results').innerText(),/Stock bajo/);
+   await page.locator('#only-alerts').click();assert.equal(await page.locator('#filter').inputValue(),'alerts');
+   await page.goto(base+'/productos.html');await page.locator('[data-minimum="p1"]').click();
+   assert.equal(await page.locator('[name=minimo]').inputValue(),'30');
+   await page.locator('[name=minimo]').fill('10');await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();
+   await page.locator('#editor').waitFor({state:'hidden'});
+  });
+  await t.test('recepciones crea lotes e inventario solo permite consultar',async()=>{
+   await page.goto(base+'/recepciones.html');await page.locator('#new-lot').click();
    await page.locator('[name=producto_id]').selectOption('p1');await page.locator('[name=codigo]').fill('LOTE-NUEVO');
    await page.locator('[name=vencimiento]').fill('2099-12-31');await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();
    await page.locator('#editor').waitFor({state:'hidden'});
-   assert.match(await page.locator('#lots').innerText(),/LOTE-NUEVO/);
+   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('browser-test-database')).lotes.some(l=>l.codigo==='LOTE-NUEVO')),true);
+   await page.goto(base+'/inventario.html');await page.locator('[data-stock-detail]').first().waitFor();
+   assert.equal(await page.locator('#new-lot, #minimum, a[href="movimientos.html"].primary').count(),0);
+   await page.locator('[data-stock-detail]').first().click();
+   assert.match(await page.locator('#stock-detail-content').innerText(),/HAR-2026-09/);
+   await page.locator('#done-stock-detail').click();
+   assert.equal(await page.locator('#stock-detail').isVisible(),false);
    await page.screenshot({path:resolve(root,'test-results/inventario-desktop.png'),fullPage:true});
   });
   await t.test('inventario diario descarga todas las páginas y respeta búsqueda y filtros',async()=>{
@@ -69,8 +88,8 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    try{
     await page.evaluate(()=>{
      const data=JSON.parse(localStorage.getItem('browser-test-database'));
-     const first=data.inventario[0];
-     for(let i=0;i<25;i++)data.inventario.push({...first,id:'extra-'+i});
+     const first=data.productos[0];
+     for(let i=0;i<25;i++)data.productos.push({...first,id:'extra-'+i,codigo:'SIN-'+i,nombre:'Producto sin stock '+i});
      localStorage.setItem('browser-test-database',JSON.stringify(data));
     });
     await page.locator('#refresh').click();
@@ -137,10 +156,10 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
    assert.equal(await page.locator('#theme-toggle').getAttribute('aria-pressed'),'true');
    await page.screenshot({path:resolve(root,'test-results/dashboard-desktop.png'),fullPage:true});
-   await page.goto(base+'/inventario.html');await page.locator('#new-lot').waitFor();
+   await page.goto(base+'/inventario.html');await page.locator('#export-daily-stock').waitFor();
    assert.equal(await page.locator('html').getAttribute('data-theme'),'dark');
    await page.setViewportSize({width:390,height:844});await page.goto(base+'/inventario.html');
-   await page.locator('#new-lot').waitFor();await page.locator('#toggle-sidebar').click();
+   await page.locator('#export-daily-stock').waitFor();await page.locator('#toggle-sidebar').click();
    assert.equal(await page.locator('.sidebar').evaluate(el=>el.classList.contains('show-mobile')),true);
    await page.locator('.sidebar-overlay').click({position:{x:360,y:600}});
    await page.screenshot({path:resolve(root,'test-results/inventario-mobile.png'),fullPage:true});

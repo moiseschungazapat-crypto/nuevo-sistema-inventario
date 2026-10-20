@@ -1,85 +1,74 @@
 import { allRows, rpc } from '../services/data.js';
-import { heading, e, badge, table, pager, field, options, openEditor, notice, loadError } from '../components/ui.js';
+import { heading, e, badge, table, pager, options, notice, loadError } from '../components/ui.js';
 import { expiryStatus, quantity, todayLima } from '../utils/domain.js';
+import { summarizeInventory, inventoryStatus, filterInventory } from '../utils/inventory.js';
 import { downloadExcelReport } from '../utils/excel-report.js';
 import { operationalSite, operationalSiteError, operationalSiteLabel } from '../utils/single-site.js';
-export async function stockPage(root, access) {
- let stock=[],lots=[],products=[],sites=[],mainSite=null,page=0;
- const canWrite=access.rol!=='consulta';
- root.innerHTML=heading('Inventario de La Liguria','Existencias por producto y lote. Los saldos cambian únicamente con movimientos.','<button class="button" id="export-daily-stock">Descargar inventario diario</button>'+(canWrite?'<button class="button" id="minimum">Configurar mínimo</button><button class="button" id="new-lot">+ Nuevo lote</button><a class="button primary" href="movimientos.html">Registrar movimiento</a>':''))+
- '<div id="stock-kpis" class="kpi-grid"></div><section class="panel"><div class="toolbar"><label class="search-label">Buscar<input id="search" type="search" placeholder="Producto, código o lote…"></label><label>Sede operativa<select id="site" disabled></select></label><label>Mostrar<select id="filter"><option value="">Todo el inventario</option><option value="low">Bajo mínimo</option><option value="expiry">Vence en 30 días</option><option value="expired">Vencido</option></select></label><button id="refresh" class="button">Actualizar</button></div><div id="results"></div><div id="pager" class="pagination"></div></section><section class="panel"><h2>Lotes registrados</h2><p class="muted">Los lotes de Inventario de La Liguria conservan su código y vencimiento para mantener la trazabilidad.</p><div id="lots"></div><p class="muted" id="lots-summary"></p></section>';
- function currentFilters(){
-  return {query:root.querySelector('#search').value.toLowerCase().trim(),site:root.querySelector('#site').value,filter:root.querySelector('#filter').value};
- }
- function filterStock(rows,{query,site,filter}=currentFilters(),today=todayLima()){
-  return rows.filter(row=>{
-   const status=expiryStatus(row.vencimiento,today);
-   return (!site||String(row.sede_id)===site)&&(!query||[row.producto,row.codigo,row.lote].some(v=>String(v||'').toLowerCase().includes(query)))&&
-    (!filter || (filter==='low'&&Number(row.total_sede)<Number(row.stock_minimo))||(filter==='expiry'&&status.tone==='warning'&&Number(row.cantidad)>0)||(filter==='expired'&&status.tone==='danger'&&Number(row.cantidad)>0));
-  });
+
+export async function stockPage(root) {
+ let stock=[],products=[],minimums=[],categories=[],mainSite=null,page=0,detailId=null;
+ root.innerHTML=heading('Inventario de La Liguria','Stock actual por producto. Consulta los lotes desde Ver.','<button class="button primary" id="export-daily-stock">Descargar inventario diario</button>')+
+ '<div id="stock-kpis" class="kpi-grid"></div><section class="panel"><div class="toolbar"><label class="search-label">Buscar<input id="search" type="search" placeholder="Producto, código, categoría o lote…"></label><label>Sede operativa<select id="site" disabled></select></label><label>Mostrar<select id="filter"><option value="">Todo el inventario</option><option value="alerts">Solo alertas</option><option value="empty">Sin stock</option><option value="low">Stock bajo</option><option value="expiry">Vence en 30 días</option><option value="expired">Vencido</option></select></label><button id="only-alerts" class="button" aria-pressed="false">Solo alertas</button><button id="refresh" class="button">Actualizar</button></div><div id="results"></div><div id="pager" class="pagination"></div></section>'+
+ '<dialog id="stock-detail" aria-labelledby="stock-detail-title"><header class="dialog-header"><h2 id="stock-detail-title"></h2><button type="button" class="button icon-only" id="close-stock-detail" aria-label="Cerrar detalle">×</button></header><div id="stock-detail-content"></div><footer class="dialog-footer"><button class="button" id="done-stock-detail">Cerrar</button></footer></dialog>';
+ const dialog=root.querySelector('#stock-detail');
+ const close=()=>{detailId=null;dialog.close();};
+ root.querySelector('#close-stock-detail').onclick=close;root.querySelector('#done-stock-detail').onclick=close;
+ dialog.oncancel=()=>{detailId=null;};
+ const currentFilters=()=>({query:root.querySelector('#search').value.toLocaleLowerCase().trim(),filter:root.querySelector('#filter').value});
+ const summary=(rows=stock,ps=products,ms=minimums,cs=categories)=>summarizeInventory(ps,rows,ms,cs,mainSite.id);
+ function detail() {
+  const row=summary().find(r=>r.producto_id===detailId);if(!row){close();return;}
+  root.querySelector('#stock-detail-title').textContent=row.codigo+' · '+row.producto;
+  const status=inventoryStatus(row),lots=[...row.lotes].sort((a,b)=>String(a.vencimiento||'').localeCompare(String(b.vencimiento||'')));
+  root.querySelector('#stock-detail-content').innerHTML=`<p class="muted">${e(operationalSiteLabel(mainSite))} · Stock actual: <strong>${quantity(row.cantidad)} ${e(row.unidad_medida)}</strong> · Mínimo: ${quantity(row.stock_minimo)} ${e(row.unidad_medida)} ${badge(status.text,status.tone)}</p>`+
+   table(['Lote','Vencimiento','Existencias','Unidad','Estado'],lots.map(l=>{const state=expiryStatus(l.vencimiento);return [e(l.lote),e(l.vencimiento),quantity(l.cantidad),e(row.unidad_medida),badge(state.text,state.tone)];}),'Este producto todavía no tiene existencias registradas por lote.');
  }
  function render(){
-  const {query}=currentFilters();
-  const filtered=filterStock(stock);
+  const rows=summary(),filtered=filterInventory(rows,currentFilters());
+  const expired=stock.filter(r=>Number(r.cantidad)>0&&['danger','warning'].includes(expiryStatus(r.vencimiento).tone)).length;
+  root.querySelector('#stock-kpis').innerHTML=[['Productos con saldo',rows.filter(r=>r.cantidad>0).length],['Sin stock',rows.filter(r=>r.cantidad<=0).length],['Stock bajo',rows.filter(r=>r.cantidad>0&&r.cantidad<r.stock_minimo).length],['Lotes por revisar',expired]].map(([label,value])=>`<div class="kpi-card"><div class="kpi-info"><span class="kpi-label">${label}</span><strong class="kpi-value">${value}</strong></div></div>`).join('');
   page=Math.min(page,Math.max(0,Math.ceil(filtered.length/20)-1));
-  const low=new Set(stock.filter(row=>Number(row.total_sede)<Number(row.stock_minimo)).map(row=>row.producto_id+':'+row.sede_id)).size;
-  const exp=stock.filter(row=>Number(row.cantidad)>0&&['danger','warning'].includes(expiryStatus(row.vencimiento).tone)).length;
-  root.querySelector('#stock-kpis').innerHTML=[['Productos con saldo',new Set(stock.filter(r=>Number(r.cantidad)>0).map(r=>r.producto_id)).size],['Sede operativa',mainSite?1:0],['Productos bajo mínimo',low],['Lotes por revisar',exp]].map(([label,value])=>`<div class="kpi-card"><div class="kpi-info"><span class="kpi-label">${label}</span><strong class="kpi-value">${value}</strong></div></div>`).join('');
-  root.querySelector('#results').innerHTML=table(['Producto','Sede operativa','Lote','Vencimiento','Existencias','Total producto','Mínimo producto','Estado'],filtered.slice(page*20,(page+1)*20).map(row=>{
-   const status=expiryStatus(row.vencimiento);
-   return [e(row.codigo)+'<br><strong>'+e(row.producto)+'</strong>',e(row.sede),e(row.lote),e(row.vencimiento),quantity(row.cantidad)+' '+e(row.unidad_medida),quantity(row.total_sede)+' '+e(row.unidad_medida),quantity(row.stock_minimo),badge(status.text,status.tone)];
+  root.querySelector('#results').innerHTML=table(['Código','Producto','Unidad','Categoría','Stock mínimo','Stock actual','Estado','Acciones'],filtered.slice(page*20,(page+1)*20).map(row=>{
+   const state=inventoryStatus(row);
+   return [e(row.codigo),e(row.producto),e(row.unidad_medida),e(row.categoria),quantity(row.stock_minimo),quantity(row.cantidad),badge(state.text,state.tone),`<button type="button" class="button small" data-stock-detail="${e(row.producto_id)}">Ver</button>`];
   }));
+  root.querySelectorAll('[data-stock-detail]').forEach(button=>button.onclick=()=>{detailId=button.dataset.stockDetail;detail();dialog.showModal();});
+  root.querySelectorAll('#results tbody tr').forEach((tr,index)=>{
+   const row=filtered[page*20+index];if(row)tr.classList.add(row.cantidad<=0?'inventory-empty':row.cantidad<row.stock_minimo?'inventory-low':'inventory-normal');
+  });
+  root.querySelector('#only-alerts').setAttribute('aria-pressed',String(root.querySelector('#filter').value==='alerts'));
   pager(root.querySelector('#pager'),filtered.length,page,20,value=>{page=value;render();});
-  const displayedLots=lots.filter(row=>(!query||[row.codigo,products.find(p=>String(p.id)===String(row.producto_id))?.nombre].some(v=>String(v||'').toLowerCase().includes(query))));
-  root.querySelector('#lots').innerHTML=table(['Producto','Código de lote','Vencimiento'],displayedLots.slice(0,50).map(row=>[e(products.find(p=>String(p.id)===String(row.producto_id))?.nombre||'—'),e(row.codigo),e(row.vencimiento)]));
-  root.querySelector('#lots-summary').textContent='Mostrando '+Math.min(50,displayedLots.length)+' de '+displayedLots.length+' lotes. Usa el buscador para encontrar un lote.';
+  if(dialog.open)detail();
+ }
+ async function refresh(){
+  try{
+   const loaded=await Promise.all([allRows('app_stock'),allRows('productos'),allRows('inventario_minimos'),allRows('categorias'),allRows('sedes')]);
+   const site=operationalSite(loaded[4]);if(!site)throw new Error(operationalSiteError(loaded[4]));
+   [stock,products,minimums,categories]=loaded;mainSite=site;stock=stock.filter(r=>String(r.sede_id)===String(site.id));
+   root.querySelector('#site').innerHTML=options([site],String(site.id),operationalSiteLabel(site),operationalSiteLabel);
+   root.querySelector('#site').value=String(site.id);loadError(null);render();
+  }catch(error){loadError(error);}
  }
  root.querySelector('#export-daily-stock').onclick=async event=>{
   const button=event.currentTarget;if(button.disabled)return;button.disabled=true;button.textContent='Preparando Excel…';
   try{
    if(!mainSite)throw new Error('Actualiza el inventario antes de descargar el reporte.');
-   const selected=currentFilters();
-   const displayFilter=root.querySelector('#filter').selectedOptions[0].textContent;
-   const rows=await rpc('app_exportar_stock',{p_producto:null,p_sede:String(mainSite.id)});
-   const now=new Date(),day=todayLima();
-   const filtered=filterStock(rows,selected,day);
+   const selected=currentFilters(),displayFilter=root.querySelector('#filter').selectedOptions[0].textContent;
+   const [rows,ps,ms,cs]=await Promise.all([rpc('app_exportar_stock',{p_producto:null,p_sede:String(mainSite.id)}),allRows('productos'),allRows('inventario_minimos'),allRows('categorias')]);
+   const now=new Date(),day=todayLima(),filtered=filterInventory(summary(rows,ps,ms,cs),selected,day);
    downloadExcelReport('inventario-diario-'+day+'.xlsx',{
     title:'INVENTARIO DIARIO · '+day.split('-').reverse().join('/'),sheetName:'Inventario diario',now,
-    headers:['Código','Producto','Sede','Lote','Vencimiento','Existencias','Unidad','Total producto/sede','Mínimo producto/sede','Estado'],
-    rows:filtered.map(row=>[row.codigo,row.producto,row.sede,row.lote,row.vencimiento,row.cantidad,row.unidad_medida,row.total_sede,row.stock_minimo,expiryStatus(row.vencimiento,day).text]),
-    widths:[18,36,30,27,19,16,14,24,25,24],numericColumns:[5,7,8],dateColumns:{4:'date'},
+    headers:['Código','Producto','Unidad','Categoría','Stock mínimo','Stock actual','Estado'],
+    rows:filtered.map(r=>[r.codigo,r.producto,r.unidad_medida,r.categoria,r.stock_minimo,r.cantidad,inventoryStatus(r).text]),
+    widths:[18,36,16,28,20,20,22],numericColumns:[4,5],
     filters:'Sede: '+operationalSiteLabel(mainSite)+' · Mostrar: '+displayFilter+(selected.query?' · Búsqueda: '+selected.query:''),
-    note:'Existencias al momento de la descarga. Incluye todas las páginas filtradas. Los totales y mínimos por producto/sede no se suman entre lotes.',
-   });
-   notice('Inventario diario descargado en Excel: '+filtered.length+' registros.');
+    note:'Existencias al momento de la descarga. Una fila por producto, incluidos los productos sin stock. Incluye todas las páginas filtradas.',
+   });notice('Inventario diario descargado en Excel: '+filtered.length+' productos.');
   }catch(error){notice(error.message||'No se pudo descargar el inventario diario.',true);}
   finally{button.disabled=false;button.textContent='Descargar inventario diario';}
  };
- async function refresh(){
-  try{
-   const [allStock,loadedLots,loadedProducts,allSites]=await Promise.all([allRows('app_stock'),allRows('lotes'),allRows('productos'),allRows('sedes')]);
-   mainSite=operationalSite(allSites);
-   const siteError=operationalSiteError(allSites);
-   if(siteError) throw new Error(siteError);
-   stock=allStock.filter(row=>String(row.sede_id)===String(mainSite.id));
-   lots=loadedLots; products=loadedProducts; sites=[mainSite];
-   const select=root.querySelector('#site');
-   select.innerHTML=options(sites,String(mainSite.id),operationalSiteLabel(mainSite),operationalSiteLabel);
-   select.value=String(mainSite.id);
-   loadError(null);render();
-  }catch(error){loadError(error);}
- }
- root.querySelector('#new-lot')?.addEventListener('click',()=>{
-  openEditor({title:'Registrar lote',fields:field('producto_id','Producto',{required:true,choices:options(products.filter(p=>p.estado&&p.controla_inventario!==false))})+field('codigo','Código de lote',{required:true,maxLength:100})+field('vencimiento','Fecha de vencimiento',{type:'date',required:true}),save:async values=>{
-   await rpc('app_crear_lote',{p_producto:values.producto_id,p_codigo:values.codigo.trim(),p_vencimiento:values.vencimiento}); notice('Lote registrado. Ahora puedes registrar su entrada.');await refresh();
-  }});
- });
- root.querySelector('#minimum')?.addEventListener('click',()=>{
-   openEditor({title:'Mínimo por producto',fields:field('producto_id','Producto',{required:true,choices:options(products)})+`<p class="muted full-width">Sede operativa: ${e(operationalSiteLabel(mainSite))}</p>`+field('minimo','Cantidad mínima',{type:'number',min:0,step:'0.001',required:true}),save:async values=>{
-    await rpc('app_configurar_minimo',{p_producto:values.producto_id,p_sede:String(mainSite.id),p_minimo:Number(values.minimo)});notice('Mínimo actualizado.');await refresh();
-  }});
- });
- for(const id of ['search','site','filter']) root.querySelector('#'+id).addEventListener(id==='search'?'input':'change',()=>{page=0;render();});
+ for(const id of ['search','filter'])root.querySelector('#'+id).addEventListener(id==='search'?'input':'change',()=>{page=0;render();});
+ root.querySelector('#only-alerts').onclick=()=>{root.querySelector('#filter').value=root.querySelector('#filter').value==='alerts'?'':'alerts';page=0;render();};
  root.querySelector('#refresh').onclick=refresh;await refresh();
- return {refresh,tables:['inventario','inventario_minimos','lotes','productos','sedes']};
+ return {refresh,tables:['inventario','inventario_minimos','lotes','productos','categorias','sedes']};
 }
