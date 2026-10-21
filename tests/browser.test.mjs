@@ -111,6 +111,20 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
     assert.match((await readFile(path)).toString('utf8'),/Mostrar: Vencido/);
    }finally{await page.evaluate(value=>localStorage.setItem('browser-test-database',value),original);}
   });
+  await t.test('recepción de perecible conserva la fecha aunque el selector de vencimiento esté bloqueado',async()=>{
+   const snapshot=await page.evaluate(()=>localStorage.getItem('browser-test-database'));
+   try{
+    await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('browser-test-database'));d.productos[0].es_perecible=true;localStorage.setItem('browser-test-database',JSON.stringify(d));});
+    await page.goto(base+'/recepciones.html');await page.locator('#new-reception').click();
+    await page.locator('[name=proveedor_id]').selectOption('pr1');await page.locator('[name=serie]').fill('F001');await page.locator('[name=numero]').fill('PERECIBLE-1');
+    await page.locator('[name=producto_0]').selectOption('p1');await page.locator('[name=recibida_0]').fill('20');
+    assert.equal(await page.locator('[name=caducidad_0]').isDisabled(),true);
+    await page.locator('[name=vencimiento_0]').fill('2099-10-31');
+    await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();await page.locator('#editor').waitFor({state:'hidden'});
+    const data=await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('browser-test-database'));return {line:d.recepcion_detalles.at(-1),lot:d.lotes.at(-1)};});
+    assert.equal(data.line.vencimiento,'2099-10-31');assert.equal(data.lot.vencimiento,'2099-10-31');assert.equal(data.line.cantidad_recibida,20);
+   }finally{await page.evaluate(value=>localStorage.setItem('browser-test-database',value),snapshot);}
+  });
   await t.test('recepción registra varios productos con lote automático sin perder datos al reintentar',async()=>{
    await page.goto(base+'/recepciones.html');await page.locator('#new-reception').click();
    const snapshot=await page.evaluate(()=>localStorage.getItem('browser-test-database'));

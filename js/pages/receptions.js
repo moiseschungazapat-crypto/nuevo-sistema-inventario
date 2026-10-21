@@ -237,7 +237,8 @@ export async function receptionsPage(root, access) {
      const product=products.find(row=>String(row.id)===String(p));
      const r=Number(values['recibida_'+i]),f=values['facturada_'+i]===''?r:Number(values['facturada_'+i]);
      if(!product||!Number.isFinite(f)||!Number.isFinite(r)||f<=0||r<0||r>f)throw new Error('Revisa producto y cantidades en las líneas de la recepción.');
-     const existing=values['lote_'+i]||null,expiration=values['caducidad_'+i]==='fecha'?values['vencimiento_'+i]||null:null;
+     // Disabled selects are omitted by FormData. Perishables always use the date field.
+     const existing=values['lote_'+i]||null,expiration=(product.es_perecible||values['caducidad_'+i]==='fecha')?values['vencimiento_'+i]||null:null;
      if(product.controla_inventario!==false&&r>0&&!existing&&(product.es_perecible||values['caducidad_'+i]==='fecha')&&!expiration)throw new Error('Indica el vencimiento de '+product.nombre+'.');
      detalles.push({producto_id:p,lote_id:product.controla_inventario===false?null:existing,codigo_lote:values['codigo_lote_'+i]?.trim()||null,vencimiento:expiration,cantidad_facturada:f,cantidad_recibida:r,unidad:product.unidad_medida,precio_unitario:nullableNumber(values['precio_'+i])});
     }
