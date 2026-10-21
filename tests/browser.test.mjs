@@ -69,7 +69,7 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    await page.locator('#editor').waitFor({state:'hidden'});
   });
   await t.test('recepciones crea lotes e inventario solo permite consultar',async()=>{
-   await page.goto(base+'/recepciones.html');await page.locator('#new-lot').click();
+   await page.goto(base+'/recepciones.html');await page.locator('#manual-lots summary').click();await page.locator('#new-lot').click();
    await page.locator('[name=producto_id]').selectOption('p1');await page.locator('[name=codigo]').fill('LOTE-NUEVO');
    await page.locator('[name=vencimiento]').fill('2099-12-31');await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();
    await page.locator('#editor').waitFor({state:'hidden'});
@@ -110,6 +110,33 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
     await (await filteredDownload).saveAs(path);
     assert.match((await readFile(path)).toString('utf8'),/Mostrar: Vencido/);
    }finally{await page.evaluate(value=>localStorage.setItem('browser-test-database',value),original);}
+  });
+  await t.test('recepción registra varios productos con lote automático sin perder datos al reintentar',async()=>{
+   await page.goto(base+'/recepciones.html');await page.locator('#new-reception').click();
+   const snapshot=await page.evaluate(()=>localStorage.getItem('browser-test-database'));
+   try{
+    await page.locator('[name=proveedor_id]').selectOption('pr1');await page.locator('[name=serie]').fill('F001');await page.locator('[name=numero]').fill('SIMPLE-1');
+    await page.locator('[name=producto_0]').selectOption('p1');await page.locator('[name=recibida_0]').fill('4');
+    await page.locator('[name=vencimiento_0]').fill('2099-12-31');
+    assert.equal(await page.locator('[name=lote_0]').isVisible(),false);
+    await page.locator('#add-reception-line').click();
+    await page.locator('[name=producto_1]').selectOption('p1');await page.locator('[name=recibida_1]').fill('2');
+    await page.locator('[name=caducidad_1]').selectOption('ninguno');
+    await page.screenshot({path:resolve(root,'test-results/recepcion-simple.png'),fullPage:true});
+    await page.evaluate(()=>localStorage.setItem('test-reception-network-failure','once'));
+    await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();
+    await page.waitForFunction(()=>document.querySelector('#editor-error').textContent.includes('reintentar'));
+    assert.equal(await page.locator('[name=recibida_0]').inputValue(),'4');
+    const afterFirst=await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('browser-test-database'));return {lots:d.lotes.length,receipts:d.recepciones.length};});
+    await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();await page.locator('#editor').waitFor({state:'hidden'});
+    const afterRetry=await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('browser-test-database'));return {lots:d.lotes.length,receipts:d.recepciones.length};});
+    assert.deepEqual(afterFirst,afterRetry);
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('browser-test-database')).recepcion_detalles.slice(-2).every(d=>d.cantidad_facturada===d.cantidad_recibida)),true);
+    await page.goto(base+'/movimientos.html');await page.locator('#new-movement').click();
+    await page.locator('[name=producto_id]').selectOption('p1');
+    assert.match(await page.locator('[name=lote_id]').innerText(),/Sin vencimiento/);
+    await page.locator('#cancel-editor').click();await page.locator('[data-confirm-yes]').click();
+   }finally{await page.evaluate(value=>localStorage.setItem('browser-test-database',value),snapshot);}
   });
   await t.test('respuesta perdida permite reintentar sin duplicar el movimiento',async()=>{
    await page.goto(base+'/movimientos.html');await page.locator('#new-movement').click();

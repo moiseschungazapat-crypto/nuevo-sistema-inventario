@@ -63,11 +63,15 @@ export async function receptionsPage(root, access) {
  function line(i,required=false){
   return `<div class="reception-line" data-reception-line data-index="${i}">
    ${field('producto_'+i,'Producto',{required,choices:options(products.filter(p=>p.estado),'', 'Seleccionar…',productLabel),help:'Producto tal como aparece en la factura.'})}
-   ${field('lote_'+i,'Lote',{choices:'<option value="">No aplica / seleccionar</option>',help:'Código del lote y vencimiento, si aplica.'})}
-   ${field('facturada_'+i,'Facturada',{type:'number',required,min:required?0.001:0,step:'0.001',help:'Cantidad indicada en la factura.'})}
-   ${field('recibida_'+i,'Recibida',{type:'number',required,min:0,step:'0.001',help:'Cantidad que llegó físicamente.'})}
+   ${field('recibida_'+i,'Cantidad recibida',{type:'number',required,min:0,step:'0.001',help:'Cantidad que llegó físicamente.'})}
+   <div class="reception-expiry">${field('caducidad_'+i,'Vencimiento',{choices:'<option value="fecha">Tiene vencimiento</option><option value="ninguno">Sin vencimiento</option>'})}${field('vencimiento_'+i,'Fecha de vencimiento',{type:'date'})}</div>
    ${field('unidad_'+i,'Unidad',{required,value:'unidad',help:'Se completa desde el catálogo.'})}
-   ${field('precio_'+i,'Precio unitario (opcional)',{type:'number',min:0,step:'0.0001',help:'Precio por unidad, si aparece.'})}
+   <details class="reception-line-extra reception-optional"><summary>Lote y datos de factura (opcional)</summary><div class="form-grid">
+    ${field('codigo_lote_'+i,'Lote del proveedor (opcional)',{maxLength:100,help:'Si lo dejas vacío, el sistema genera un código interno.'})}
+    ${field('lote_'+i,'Usar un lote existente (opcional)',{choices:'<option value="">Crear automáticamente al guardar</option>',help:'Solo si esta entrega pertenece a un lote registrado.'})}
+    ${field('facturada_'+i,'Cantidad facturada (opcional)',{type:'number',min:0.001,step:'0.001',help:'Si no se indica, se toma igual a la recibida. Completa este dato si hubo faltantes.'})}
+    ${field('precio_'+i,'Precio unitario (opcional)',{type:'number',min:0,step:'0.0001'})}
+   </div></details>
    <button type="button" class="button line-remove" data-remove-line ${required?'hidden':''}>Quitar</button>
   </div>`;
  }
@@ -75,21 +79,30 @@ export async function receptionsPage(root, access) {
  function syncLine(lineNode){
   const product=lineNode.querySelector('[name^="producto_"]');
   const lot=lineNode.querySelector('[name^="lote_"]');
-  const unit=lineNode.querySelector('[name^="unidad_"]');
+  const unit=lineNode.querySelector('[name^="unidad_"]'),expiry=lineNode.querySelector('[name^="vencimiento_"]'),mode=lineNode.querySelector('[name^="caducidad_"]'),code=lineNode.querySelector('[name^="codigo_lote_"]');
   const row=products.find(p=>String(p.id)===product.value);
+  const changed=lineNode.dataset.product!==product.value;
+  if(changed){lot.value='';code.value='';expiry.value='';mode.value='fecha';lineNode.dataset.product=product.value;}
   const selected=lot.value;
-  lot.innerHTML=options(row ? lots.filter(l=>String(l.producto_id)===String(row.id)).sort((a,b)=>String(a.vencimiento).localeCompare(String(b.vencimiento))) : [],selected,'No aplica / seleccionar',l=>`${l.codigo} · Vence ${l.vencimiento}`);
+  lot.innerHTML=options(row ? lots.filter(l=>String(l.producto_id)===String(row.id)).sort((a,b)=>String(a.vencimiento||'9999').localeCompare(String(b.vencimiento||'9999'))) : [],selected,'Crear automáticamente al guardar',l=>`${l.codigo} · ${l.vencimiento?'Vence '+l.vencimiento:'Sin vencimiento'}`);
+  const existing=lots.find(l=>String(l.id)===lot.value);
+  if(existing){expiry.value=existing.vencimiento||'';mode.value=existing.vencimiento?'fecha':'ninguno';}
+  const controls=Boolean(row&&row.controla_inventario!==false);
+  lot.disabled=!controls;code.disabled=!controls||Boolean(existing);mode.disabled=!controls||Boolean(existing)||Boolean(row?.es_perecible);
+  if(row?.es_perecible)mode.value='fecha';
+  expiry.disabled=!controls||Boolean(existing)||mode.value==='ninguno';
+  expiry.required=controls&&!existing&&mode.value==='fecha'&&Number(lineNode.querySelector('[name^="recibida_"]').value)>0;
+  expiry.closest('label').hidden=mode.value==='ninguno'||!controls;
+  lineNode.querySelector('.reception-expiry').hidden=!controls;
+  unit.readOnly=true;
   if(row){
    unit.value=row.unidad_medida||'unidad';
-   lot.disabled=row.controla_inventario===false;
-   if(row.controla_inventario===false) lot.value='';
-   lot.closest('label').querySelector('small')?.remove();
-   if(row.controla_inventario!==false){const help=document.createElement('small');help.textContent=row.requiere_lote===false?'Lote opcional para este producto.':'Obligatorio si se recibe una cantidad mayor que cero.';lot.closest('label').append(help);}
-  }else{lot.disabled=false;}
+  }
  }
 
  function openReception(){
   if(!mainSite){notice(operationalSiteError(sites)||'Configura la sede de operación antes de registrar una recepción.',true);return;}
+  const operationId=crypto.randomUUID();const uploaded=new Map();
   function setValue(form,name,value){
    if(value===null||value===undefined||value==='')return;
    const control=form.elements.namedItem(name);
@@ -141,8 +154,10 @@ export async function receptionsPage(root, access) {
     setValue(form,'facturada_'+node.dataset.index,item.quantity_invoiced);
     if(product&&item.lot_code){
      const lot=lots.find(row=>String(row.producto_id)===String(product.id)&&normalizeText(row.codigo)===normalizeText(item.lot_code));
-     if(lot)setValue(form,'lote_'+node.dataset.index,lot.id);else warnings.push('El lote '+item.lot_code+' no existe todavía en el catálogo.');
+     if(lot)setValue(form,'lote_'+node.dataset.index,lot.id);else setValue(form,'codigo_lote_'+node.dataset.index,item.lot_code);
     }
+    if(item.expiration_date){setValue(form,'caducidad_'+node.dataset.index,'fecha');setValue(form,'vencimiento_'+node.dataset.index,item.expiration_date);}
+    syncLine(node);
     if(product)setValue(form,'unidad_'+node.dataset.index,product.unidad_medida);
     else if(item.unit)warnings.push('Confirma la unidad del producto '+(item.name||item.code||'detectado')+'.');
     setValue(form,'precio_'+node.dataset.index,item.unit_price);
@@ -198,7 +213,7 @@ export async function receptionsPage(root, access) {
       field('estado_pago','Estado de pago',{choices:'<option value="pendiente">Pendiente</option><option value="parcial">Parcial</option><option value="pagado">Pagado</option>',help:'Situación actual del pago.'})+
       field('detraccion_porcentaje','Detracción %',{type:'number',min:0,step:'0.01',help:'Porcentaje, solo si corresponde.'})+field('detraccion_monto','Detracción monto',{type:'number',min:0,step:'0.01',help:'Importe retenido por detracción.'})+
       field('observaciones','Observaciones',{type:'textarea',maxLength:1000,help:'Diferencias o comentarios de la recepción.'})+'</div></details>'+
-     '<p class="muted full-width">Agrega los productos de la misma factura con el botón +. La unidad se completa desde el catálogo y el lote solo es obligatorio cuando el producto lo requiere.</p><div id="reception-lines" class="full-width">'+line(0,true)+'</div>'+
+     '<p class="muted full-width">Registra qué llegó, cuánto recibiste y cuándo vence. Los lotes y las entradas se crean al guardar. Agrega todos los productos de la misma entrega con el botón +.</p><div id="reception-lines" class="full-width">'+line(0,true)+'</div>'+
      '<button type="button" id="add-reception-line" class="button full-width">+ Agregar producto</button>'+
      '<label class="field full-width">Factura o comprobante (recomendado)<input name="archivos" type="file" accept="image/jpeg,image/png,image/webp,.jfif,application/pdf" multiple><small>Puedes adjuntar imágenes o PDF. El análisis gratuito acepta JPG, PNG y WEBP; el PDF se guarda, pero debes convertirlo a imagen para leerlo.</small></label>'+
      '<div class="full-width reception-ai-actions"><button type="button" id="analyze-reception-invoice" class="button">Analizar factura gratis (OCR)</button><span id="reception-ai-status" class="muted" role="status" aria-live="polite"></span></div>'+
@@ -206,7 +221,7 @@ export async function receptionsPage(root, access) {
    setup:form=>{
     let next=1;const list=form.querySelector('#reception-lines');
     syncLine(list.querySelector('[data-reception-line]'));
-    form.addEventListener('change',event=>{if(event.target.name?.startsWith('producto_'))syncLine(event.target.closest('[data-reception-line]'));});
+    form.onchange=event=>{const node=event.target.closest('[data-reception-line]');if(node)syncLine(node);};
     form.__addReceptionLine=()=>{if(next>=50){notice('Se alcanzó el máximo de 50 productos por recepción.',true);return null;}list.insertAdjacentHTML('beforeend',line(next));syncLine(list.lastElementChild);next++;return list.lastElementChild;};
     form.querySelector('#add-reception-line').onclick=form.__addReceptionLine;
     form.querySelector('#analyze-reception-invoice').onclick=()=>analyzeInvoice(form);
@@ -220,22 +235,31 @@ export async function receptionsPage(root, access) {
     for(let i=0;i<50;i++){
      const p=values['producto_'+i];if(!p)continue;
      const product=products.find(row=>String(row.id)===String(p));
-     const f=Number(values['facturada_'+i]),r=Number(values['recibida_'+i]);
+     const r=Number(values['recibida_'+i]),f=values['facturada_'+i]===''?r:Number(values['facturada_'+i]);
      if(!product||!Number.isFinite(f)||!Number.isFinite(r)||f<=0||r<0||r>f)throw new Error('Revisa producto y cantidades en las líneas de la recepción.');
-     if(product.controla_inventario!==false&&r>0&&!values['lote_'+i])throw new Error(`Selecciona el lote de ${product.nombre}; lo recibido debe quedar trazable.`);
-     detalles.push({producto_id:p,lote_id:product.controla_inventario===false?null:(values['lote_'+i]||null),cantidad_facturada:f,cantidad_recibida:r,unidad:(values['unidad_'+i]||product.unidad_medida||'unidad').trim(),precio_unitario:nullableNumber(values['precio_'+i])});
+     const existing=values['lote_'+i]||null,expiration=values['caducidad_'+i]==='fecha'?values['vencimiento_'+i]||null:null;
+     if(product.controla_inventario!==false&&r>0&&!existing&&(product.es_perecible||values['caducidad_'+i]==='fecha')&&!expiration)throw new Error('Indica el vencimiento de '+product.nombre+'.');
+     detalles.push({producto_id:p,lote_id:product.controla_inventario===false?null:existing,codigo_lote:values['codigo_lote_'+i]?.trim()||null,vencimiento:expiration,cantidad_facturada:f,cantidad_recibida:r,unidad:product.unidad_medida,precio_unitario:nullableNumber(values['precio_'+i])});
     }
     if(!detalles.length)throw new Error('Agrega al menos un producto.');
-    const rid=await rpc('app_registrar_recepcion',{p_recepcion:{proveedor_id:values.proveedor_id,tipo_comprobante:values.tipo_comprobante,serie:values.serie.trim(),numero:values.numero.trim(),fecha_emision:values.fecha_emision,fecha_recepcion:values.fecha_recepcion,sede_id:String(mainSite.id),responsable:values.responsable.trim(),moneda:values.moneda,forma_pago:values.forma_pago||null,condicion_pago:values.condicion_pago?.trim()||null,fecha_vencimiento_pago:values.fecha_vencimiento_pago||null,guia_remision:values.guia_remision?.trim()||null,orden_compra:values.orden_compra?.trim()||null,subtotal:nullableNumber(values.subtotal),descuento:nullableNumber(values.descuento),igv:nullableNumber(values.igv),total:nullableNumber(values.total),estado_pago:values.estado_pago,detraccion_porcentaje:nullableNumber(values.detraccion_porcentaje),detraccion_monto:nullableNumber(values.detraccion_monto),observaciones:values.observaciones||'',detalles}});
     const files=values.__form.elements.archivos.files;
-    for(const file of files){const mime=fileMime(file);const max=mime==='application/pdf'?15:10;if(!['application/pdf','image/jpeg','image/png','image/webp'].includes(mime))throw new Error('Solo se aceptan imágenes JPG, PNG o WEBP y archivos PDF.');if(file.size>max*1024*1024)throw new Error('Un archivo supera el límite permitido.');const path=`${rid}/${crypto.randomUUID()}-${cleanFileName(file.name)}`;const upload=await supabase.storage.from('documentos-recepcion').upload(path,file,{upsert:false,contentType:mime});if(upload.error)throw upload.error;const saved=await supabase.from('recepcion_archivos').insert({recepcion_id:rid,ruta:path,nombre:file.name,tipo:mime,tamano:file.size});if(saved.error)throw saved.error;}
-    notice('Recepción guardada; las existencias solo aumentaron para productos de stock.');await refresh();
+    for(const file of files){const mime=fileMime(file),max=mime==='application/pdf'?15:10;if(!['application/pdf','image/jpeg','image/png','image/webp'].includes(mime))throw new Error('Solo se aceptan imágenes JPG, PNG o WEBP y archivos PDF.');if(file.size>max*1024*1024)throw new Error('Un archivo supera el límite permitido.');}
+    const rid=await rpc('app_registrar_recepcion_simple',{p_recepcion:{operacion_id:operationId,proveedor_id:values.proveedor_id,tipo_comprobante:values.tipo_comprobante,serie:values.serie.trim(),numero:values.numero.trim(),fecha_emision:values.fecha_emision,fecha_recepcion:values.fecha_recepcion,sede_id:String(mainSite.id),responsable:values.responsable.trim(),moneda:values.moneda,forma_pago:values.forma_pago||null,condicion_pago:values.condicion_pago?.trim()||null,fecha_vencimiento_pago:values.fecha_vencimiento_pago||null,guia_remision:values.guia_remision?.trim()||null,orden_compra:values.orden_compra?.trim()||null,subtotal:nullableNumber(values.subtotal),descuento:nullableNumber(values.descuento),igv:nullableNumber(values.igv),total:nullableNumber(values.total),estado_pago:values.estado_pago,detraccion_porcentaje:nullableNumber(values.detraccion_porcentaje),detraccion_monto:nullableNumber(values.detraccion_monto),observaciones:values.observaciones||'',detalles}});
+    for(const file of files){
+     const key=file.name+':'+file.size+':'+file.lastModified;
+     const state=uploaded.get(key)||{path:`${rid}/${crypto.randomUUID()}-${cleanFileName(file.name)}`,uploaded:false,registered:false};uploaded.set(key,state);
+     if(!state.uploaded){const result=await supabase.storage.from('documentos-recepcion').upload(state.path,file,{upsert:false,contentType:fileMime(file)});if(result.error&&String(result.error.statusCode)!=='409')throw result.error;state.uploaded=true;}
+     if(!state.registered){const result=await supabase.from('recepcion_archivos').insert({recepcion_id:rid,ruta:state.path,nombre:file.name,tipo:fileMime(file),tamano:file.size});if(result.error)throw result.error;state.registered=true;}
+    }
+    notice('Recepción guardada. Los lotes y las entradas se registraron automáticamente.');await refresh();
    }
   });
  }
  if(canWrite){
   const button=document.createElement('button');button.type='button';button.id='new-lot';button.className='button';button.textContent='+ Nuevo lote';
-  root.querySelector('.page-heading .actions').prepend(button);
+  const advanced=document.createElement('details');advanced.className='panel reception-optional';advanced.id='manual-lots';
+  advanced.innerHTML='<summary>Lotes manuales (opcional)</summary><p class="muted">Las recepciones crean sus lotes automáticamente. Usa esta opción solo si necesitas preparar uno para una entrada manual.</p>';
+  advanced.append(button);root.append(advanced);
   button.onclick=()=>createLot(products,refresh);
  }
  root.querySelector('#new-reception')?.addEventListener('click',openReception);root.querySelector('#refresh').onclick=refresh;await refresh();

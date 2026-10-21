@@ -70,6 +70,7 @@ test('confirmaciones protegen guardar, editar, cancelar y quitar productos', asy
   // Every section using the shared editor must ask before discarding its form.
   for (const [section, button] of [['catalogo','new-category'], ['recepciones','new-lot'], ['movimientos','new-movement'], ['usuarios','new-user'], ['recepciones','new-reception']]) {
    await page.goto(base + '/' + section + '.html');
+   if(button==='new-lot')await page.locator('#manual-lots summary').click();
    await page.locator('#' + button).click();
    await page.locator('#cancel-editor').click();
    await answer(false);

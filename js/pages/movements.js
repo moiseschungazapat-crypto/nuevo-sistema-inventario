@@ -70,7 +70,7 @@ export async function movementsPage(root,access,report=false){
     const product=form.elements.producto_id,lot=form.elements.lote_id,type=form.elements.tipo,siteId=String(mainSite.id);
     function fillLots(){
      const selected=lot.value||data.lote_id;
-     lot.innerHTML=options(lots.filter(l=>String(l.producto_id)===product.value).sort((a,b)=>a.vencimiento.localeCompare(b.vencimiento)),selected,'Seleccionar lote',l=>l.codigo+' · Vence '+l.vencimiento);info();
+     lot.innerHTML=options(lots.filter(l=>String(l.producto_id)===product.value).sort((a,b)=>String(a.vencimiento||'9999').localeCompare(String(b.vencimiento||'9999'))),selected,'Seleccionar lote',l=>l.codigo+' · '+(l.vencimiento?'Vence '+l.vencimiento:'Sin vencimiento'));info();
     }
     function info(){
      const row=stock.find(r=>String(r.producto_id)===product.value&&String(r.lote_id)===lot.value&&String(r.sede_id)===siteId);

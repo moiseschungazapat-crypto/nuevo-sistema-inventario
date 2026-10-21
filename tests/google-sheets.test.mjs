@@ -27,6 +27,8 @@ test('reporte usa la fecha de Perú, concilia saldos con ajustes y traslados y c
  const central=stocks.find(r=>r[3]==='Central');
  assert.deepEqual(central.slice(5),[8,10,2,1,2,0,3,12,15,'Bajo mínimo']);
  assert.ok(report.rows.some(r=>r.includes('Vencido')));
+ const noExpiry=sample();noExpiry.stock[0].vencimiento=null;
+ assert.ok(buildReport(noExpiry).rows.some(r=>r.includes('Sin vencimiento')));
  assert.ok(!stocks.some(r=>r[0]==='SER'));
  const noMovement=sample();noMovement.movements=[];
  assert.equal(buildReport(noMovement).rows.find(r=>r[0]==='HAR' && r[3]==='Central')[5],12);

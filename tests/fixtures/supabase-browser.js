@@ -10,7 +10,7 @@ const initial={
  lotes:[{id:'l1',producto_id:'p1',codigo:'HAR-2026-09',vencimiento:'2099-10-20'}],
  inventario:[{id:'i1',producto_id:'p1',sede_id:'s1',lote_id:'l1',cantidad:25}],
  inventario_minimos:[{id:'mi1',producto_id:'p1',sede_id:'s1',minimo:10}],
- movimientos:[], operations:{}
+ movimientos:[], operations:{},recepciones:[],recepcion_detalles:[],receiptOperations:{}
 };
 function db(){return JSON.parse(localStorage.getItem(key)||JSON.stringify(initial));}
 function save(value){localStorage.setItem(key,JSON.stringify(value));new BroadcastChannel('test-realtime').postMessage('change');}
@@ -61,7 +61,26 @@ export const supabase={
  async rpc(name,args={}){
   const data=db();
   if(name==='app_mi_acceso')return {data:data.auth_perfiles[0],error:null};
-  if(name==='app_listar_recepciones')return {data:[],error:null};
+  if(name==='app_listar_recepciones')return {data:data.recepciones||[],error:null};
+  if(name==='app_registrar_recepcion_simple'){
+   const r=args.p_recepcion;
+   if(data.receiptOperations?.[r.operacion_id])return {data:data.receiptOperations[r.operacion_id],error:null};
+   const id=crypto.randomUUID();
+   for(const d of r.detalles){
+    const product=data.productos.find(p=>String(p.id)===String(d.producto_id));
+    let lotId=d.lote_id;
+    if(product.controla_inventario!==false&&d.cantidad_recibida>0){
+     if(!lotId){lotId=crypto.randomUUID();data.lotes.push({id:lotId,producto_id:d.producto_id,codigo:d.codigo_lote||'REC-'+r.operacion_id,vencimiento:d.vencimiento||null});}
+     const balance=data.inventario.find(i=>i.producto_id===d.producto_id&&i.lote_id===lotId&&i.sede_id===r.sede_id);
+     if(balance)balance.cantidad+=d.cantidad_recibida;else data.inventario.push({id:crypto.randomUUID(),producto_id:d.producto_id,lote_id:lotId,sede_id:r.sede_id,cantidad:d.cantidad_recibida});
+    }
+    (data.recepcion_detalles||=[]).push({...d,recepcion_id:id,lote_id:lotId});
+   }
+   (data.recepciones||=[]).push({...r,id,created_at:new Date().toISOString(),proveedor:'Proveedor',sede:'La Liguria S.A.',productos:r.detalles.map(d=>data.productos.find(p=>p.id===d.producto_id)?.nombre).join(', '),facturado:r.detalles.reduce((s,d)=>s+d.cantidad_facturada,0),recibido:r.detalles.reduce((s,d)=>s+d.cantidad_recibida,0),faltante:0,archivos:0});
+   (data.receiptOperations||={})[r.operacion_id]=id;save(data);
+   if(localStorage.getItem('test-reception-network-failure')==='once'){localStorage.removeItem('test-reception-network-failure');return {data:null,error:{message:'Se perdió la respuesta. Vuelve a guardar para reintentar.'}};}
+   return {data:id,error:null};
+  }
   if(name==='app_exportar_movimientos')return {data:moves(data),error:null};
   if(name==='app_exportar_stock')return {data:stock(data),error:null};
   if(name==='app_resumen')return {data:{productos:data.productos.length,bajo_minimo:0,entradas:data.movimientos.filter(m=>m.tipo==='entrada').length,salidas:0,vencidos:0,por_vencer:0,actividad:['09','10','11','12','13','14','15'].map((day,i)=>({dia:'2026-09-'+day,total:i})),recientes:moves(data).slice(-8)},error:null};
