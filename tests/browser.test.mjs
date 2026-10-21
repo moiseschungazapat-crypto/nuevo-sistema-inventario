@@ -152,17 +152,57 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
     await page.locator('#cancel-editor').click();await page.locator('[data-confirm-yes]').click();
    }finally{await page.evaluate(value=>localStorage.setItem('browser-test-database',value),snapshot);}
   });
-  await t.test('respuesta perdida permite reintentar sin duplicar el movimiento',async()=>{
+  await t.test('Movimientos separa salidas, entradas excepcionales y ajustes por permisos',async()=>{
+   await page.goto(base+'/movimientos.html');await page.locator('#new-movement').click();
+   assert.equal(await page.locator('#editor-title').textContent(),'Registrar salida');
+   assert.deepEqual(await page.locator('[name=tipo] option').evaluateAll(nodes=>nodes.map(n=>n.value)),['salida']);
+   await page.locator('#cancel-editor').click();await page.locator('[data-confirm-yes]').click();
+   await page.locator('#other-operations summary').click();await page.locator('#manual-entry').click();
+   assert.deepEqual(await page.locator('[name=tipo] option').evaluateAll(nodes=>nodes.map(n=>n.value)),['entrada']);
+   assert.match(await page.locator('#editor-fields').innerText(),/evitar duplicar el stock/);
+   await page.locator('#cancel-editor').click();await page.locator('[data-confirm-yes]').click();
+   await page.locator('#stock-adjustment').click();
+   assert.deepEqual(await page.locator('[name=tipo] option').evaluateAll(nodes=>nodes.map(n=>n.value)),['ajuste_positivo','ajuste_negativo']);
+   await page.locator('#cancel-editor').click();await page.locator('[data-confirm-yes]').click();
+   await page.screenshot({path:resolve(root,'test-results/movimientos-operaciones.png'),fullPage:true});
+   const snapshot=await page.evaluate(()=>localStorage.getItem('browser-test-database'));
+   try{
+    await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('browser-test-database'));d.auth_perfiles[0].rol='operador';localStorage.setItem('browser-test-database',JSON.stringify(d));});
+    await page.goto(base+'/movimientos.html');await page.locator('#new-movement').click();
+    assert.deepEqual(await page.locator('[name=tipo] option').evaluateAll(nodes=>nodes.map(n=>n.value)),['salida']);
+    await page.locator('#cancel-editor').click();await page.locator('[data-confirm-yes]').click();
+    await page.locator('#other-operations summary').click();assert.equal(await page.locator('#stock-adjustment').count(),0);
+    assert.equal(await page.locator('#manual-entry').isVisible(),true);
+   }finally{await page.evaluate(value=>localStorage.setItem('browser-test-database',value),snapshot);}
+  });
+  await t.test('respuesta perdida permite reintentar sin duplicar la salida',async()=>{
    await page.goto(base+'/movimientos.html');await page.locator('#new-movement').click();
    await page.locator('[name=producto_id]').selectOption('p1');await page.locator('[name=lote_id]').selectOption('l1');
    await page.locator('[name=cantidad]').fill('3');
-   await page.locator('[name=motivo]').fill('Recepción de compra');
+   await page.locator('[name=motivo]').fill('Entrega a cocina');
    await page.evaluate(()=>localStorage.setItem('test-network-failure','once'));await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();
    await page.waitForFunction(()=>document.querySelector('#editor-error').textContent.includes('reintentar'));
    assert.equal(await page.locator('[name=cantidad]').isDisabled(),true);
    await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();await page.locator('#editor').waitFor({state:'hidden'});
    assert.equal(await page.locator('#results tbody tr').count(),1);
-   assert.match(await page.locator('#results').innerText(),/Recepción de compra/);
+   assert.match(await page.locator('#results').innerText(),/Entrega a cocina/);
+   assert.match(await page.locator('#results').innerText(),/Salida/);
+   assert.equal(await page.locator('#retry-movement').count(),0);
+  });
+  await t.test('una entrada pendiente conserva su tipo al reabrirse desde Registrar salida',async()=>{
+   const snapshot=await page.evaluate(()=>localStorage.getItem('browser-test-database'));
+   const key='liguria-movement-11111111-1111-4111-8111-111111111111';
+   try{
+    await page.evaluate(key=>localStorage.setItem(key,JSON.stringify({key:crypto.randomUUID(),values:{tipo:'entrada',producto_id:'p1',lote_id:'l1',sede_id:'s1',destino_id:null,cantidad:2,motivo:'Saldo inicial',documento:''}})),key);
+    await page.goto(base+'/movimientos.html');await page.locator('#retry-movement').waitFor();
+    await page.locator('#new-movement').click();
+    assert.equal(await page.locator('#editor-title').textContent(),'Reintentar movimiento pendiente');
+    assert.equal(await page.locator('[name=tipo]').inputValue(),'entrada');
+    assert.equal(await page.locator('[name=tipo]').isDisabled(),true);
+    await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();await page.locator('#editor').waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(key=>localStorage.getItem(key),key),null);
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('browser-test-database')).movimientos.at(-1).tipo),'entrada');
+   }finally{await page.evaluate(({snapshot,key})=>{localStorage.setItem('browser-test-database',snapshot);localStorage.removeItem(key);},{snapshot,key});}
   });
   await t.test('reportes descargan Excel con formato para movimientos y existencias',async()=>{
    await page.goto(base+'/reportes.html');
@@ -213,6 +253,8 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    });
    await page.goto(base+'/dashboard.html');await page.locator('.activity-column').first().waitFor();
    assert.equal(await page.locator('#update-google-sheets').count(),0);
+   await page.goto(base+'/movimientos.html');await page.locator('#refresh').waitFor();
+   assert.equal(await page.locator('#new-movement, #manual-entry, #stock-adjustment').count(),0);
   });
   assert.deepEqual(errors,[]);
  }finally{await browser?.close();await new Promise(done=>server.close(done));}
