@@ -10,7 +10,8 @@ const initial={
  lotes:[{id:'l1',producto_id:'p1',codigo:'HAR-2026-09',vencimiento:'2099-10-20'}],
  inventario:[{id:'i1',producto_id:'p1',sede_id:'s1',lote_id:'l1',cantidad:25}],
  inventario_minimos:[{id:'mi1',producto_id:'p1',sede_id:'s1',minimo:10}],
- movimientos:[], operations:{},recepciones:[],recepcion_detalles:[],receiptOperations:{}
+ movimientos:[], operations:{},recepciones:[],recepcion_detalles:[],receiptOperations:{},
+ auditoria:[{fecha:'2026-10-20T19:40:48Z',tabla:'lotes',operacion:'INSERT',actor_nombre:'Ana Administradora',actor_email:'admin@example.test',resumen:JSON.stringify({id:'technical-id',codigo:'REC-20261020-01',producto_id:'p1',vencimiento:'2026-10-24',documento_origen:'Factura HDA000123-1234',created_at:'2026-10-20T19:40:48Z'})}]
 };
 function db(){return JSON.parse(localStorage.getItem(key)||JSON.stringify(initial));}
 function save(value){localStorage.setItem(key,JSON.stringify(value));new BroadcastChannel('test-realtime').postMessage('change');}
@@ -102,6 +103,7 @@ export const supabase={
    return {data:{id,repetido:false},error:null};
   }
   if(name==='app_listar_usuarios')return {data:data.auth_perfiles.map(p=>({...p,email:'admin@example.test'})),error:null};
+  if(name==='app_listar_auditoria')return {data:data.auditoria||[],error:null};
   if(name==='app_guardar_usuario')return {data:null,error:null};
   return {data:null,error:{code:'PGRST202'}};
  }

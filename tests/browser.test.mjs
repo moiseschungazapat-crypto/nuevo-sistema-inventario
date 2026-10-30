@@ -55,7 +55,14 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    await page.locator('#editor').waitFor({state:'hidden'});
    assert.match(await page.locator('#catalog-view').innerText(),/Empaques nuevos/);
   });
+  await t.test('auditoría presenta los cambios con lenguaje claro y sin identificadores internos',async()=>{
+   await page.goto(base+'/auditoria.html');await page.locator('.audit-summary').first().waitFor();
+   const text=await page.locator('#audit-results').innerText();
+   assert.match(text,/Lotes/);assert.match(text,/Creación/);assert.match(text,/Código:\s*REC-20261020-01/);assert.match(text,/Vencimiento:\s*24\/10\/2026/);
+   assert.doesNotMatch(text,/technical-id|producto_id|created_at|\{"id"/);
+  });
   await t.test('cambios en otra pestaña se actualizan sin perder el formulario abierto',async()=>{
+   await page.goto(base+'/categorias.html');
    await page.locator('#new-category').click();await page.locator('[name=nombre]').fill('Borrador sin guardar');
    const other=await context.newPage();await other.goto(base+'/categorias.html');await other.locator('#new-category').click();
    await other.locator('[name=nombre]').fill('Desde otra pestaña');await other.locator('#save-editor').click();await other.locator('[data-confirm-yes]').click();await other.locator('#editor').waitFor({state:'hidden'});
