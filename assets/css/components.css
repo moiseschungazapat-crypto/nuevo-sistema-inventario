@@ -207,3 +207,18 @@ details summary{transition:color .2s ease,transform .2s ease}details summary:hov
 @keyframes overlayReveal{from{opacity:0}to{opacity:1}}
 @media(max-width:768px){.motion-ready{transform:translateY(8px);transition-duration:.34s}}
 @media(prefers-reduced-motion:reduce){.motion-ready,.motion-ready.motion-visible{transform:none!important;transition:none!important}.data-table tbody tr,.form-grid .field,details[open]>:not(summary),.catalog-tab.primary,.sidebar.show-mobile,.sidebar-overlay.active{animation:none!important}}
+
+/* Estados seleccionados ligeros: el acento indica ubicación sin crear bloques oscuros. */
+html:not([data-theme="dark"]) .submenu .submenu-item.active{background:#f2f6f8;color:#17394a;box-shadow:inset 3px 0 var(--liguria-accent),0 4px 12px rgba(15,35,56,.05)}
+html:not([data-theme="dark"]) .submenu .submenu-item.active i{color:#bd713d}
+.catalog-tabs{width:fit-content;max-width:100%;gap:5px;padding:4px;margin-bottom:20px;border:1px solid #e2e8f0;border-radius:10px;background:#f5f7f9}
+.catalog-tabs .catalog-tab{margin:0;border:1px solid transparent;border-radius:7px;color:#5b6979;background:transparent;box-shadow:none}
+.catalog-tabs .catalog-tab.primary{background:#fff;color:#17394a;border-color:#dce5eb;box-shadow:0 3px 9px rgba(15,35,56,.08),inset 0 -2px var(--liguria-accent)}
+.catalog-tabs .catalog-tab:not(.primary):hover{background:#edf2f5;color:#17394a}
+html[data-theme="dark"] .sidebar-footer{background:#0d1725;border-color:#26384e}
+html[data-theme="dark"] .btn-logout{background:transparent}html[data-theme="dark"] .btn-logout:hover{background:#2a1b25}
+html[data-theme="dark"] .catalog-tabs{background:#0d1725;border-color:#2b3e54}
+html[data-theme="dark"] .catalog-tabs .catalog-tab{color:#9fb0c2;background:transparent;border-color:transparent}
+html[data-theme="dark"] .catalog-tabs .catalog-tab.primary{background:#17263a;color:#f0f6fc;border-color:#30465e;box-shadow:0 3px 10px rgba(0,0,0,.18),inset 0 -2px var(--liguria-accent)}
+html[data-theme="dark"] .catalog-tabs .catalog-tab:not(.primary):hover{background:#132235;color:#dbe8f6}
+@media(max-width:768px){.catalog-tabs{width:100%}}

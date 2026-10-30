@@ -43,6 +43,15 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    await page.locator('[data-menu-group=administration] .menu-group-toggle').click();
    assert.equal(await page.locator('[data-menu-group=settings]').evaluate(node=>node.classList.contains('open')),false);
    assert.equal(await page.locator('[data-menu-group=administration] .menu-group-toggle').getAttribute('aria-expanded'),'true');
+   await page.evaluate(()=>localStorage.setItem('liguria-theme','light'));await page.goto(base+'/catalogo.html');
+   const activeMenu=await page.locator('.submenu-item.active').evaluate(node=>getComputedStyle(node).backgroundColor);
+   assert.notEqual(activeMenu,'rgb(11, 41, 51)');
+   const activeTab=await page.locator('.catalog-tab.primary').evaluate(node=>getComputedStyle(node).color);
+   assert.equal(activeTab,'rgb(23, 57, 74)');
+   await page.locator('#theme-toggle').click();
+   const footerBackground=await page.locator('.sidebar-footer').evaluate(node=>getComputedStyle(node).backgroundColor);
+   assert.equal(footerBackground,'rgb(13, 23, 37)');
+   await page.screenshot({path:resolve(root,'test-results/catalogo-dark.png'),fullPage:true});
   });
   await t.test('categorías guarda y actualiza datos',async()=>{
    await page.goto(base+'/categorias.html');await page.locator('#new-category').click();
