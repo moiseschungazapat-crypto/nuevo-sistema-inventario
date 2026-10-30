@@ -50,10 +50,8 @@ export function buildReport(data) {
  };
  const time = value => new Date(value).toLocaleString('es-PE',{timeZone:'America/Lima',hour12:false});
  add('LA LIGURIA S.A. — REPORTE DIARIO');
- add('Fecha del reporte: '+title);
- add('Actualizado: '+time(data.generated_at)+' (Perú). Fuente: Supabase.');
- add('Saldo inicial = saldo al corte menos movimientos netos del día, incluidos ajustes y traslados.');
- add('Actualización manual. Los saldos corresponden a la hora del envío; actualiza nuevamente al cierre.');
+ add('Fecha',title,'Actualizado (Perú)',time(data.generated_at),'Fuente','Supabase');
+ add('Corte manual. Saldo inicial = saldo al corte menos los movimientos netos del día. Actualiza nuevamente al cierre.');
  section('EXISTENCIAS POR PRODUCTO Y SEDE',['Código','Producto','Categoría','Sede','Unidad','Stock inicial','Entradas','Salidas','Ajustes (+)','Ajustes (−)','Traslados recibidos','Traslados enviados','Stock al corte','Mínimo','Estado'],
   [...balances.values()].map(b => {
    const p=products.get(b.p)||{}, s=sites.get(b.s)||{};
@@ -89,8 +87,8 @@ export function reportRequests(report, existing) {
  const columns = Math.max(...report.rows.map(r=>r.length));
  const rowCount = Math.max(report.rows.length,existing?.gridProperties?.rowCount||0,100);
  const columnCount = Math.max(columns,existing?.gridProperties?.columnCount||0);
- const frozenRowCount=report.tables[0].header+1;
- const gridProperties={rowCount,columnCount,frozenRowCount,frozenColumnCount:0,hideGridlines:true};
+ // No se congelan filas: fijar la primera cabecera también inmovilizaría todo el bloque informativo superior.
+ const gridProperties={rowCount,columnCount,frozenRowCount:0,frozenColumnCount:0,hideGridlines:true};
  const requests = existing ? [{updateSheetProperties:{properties:{sheetId,gridProperties},fields:'gridProperties'}}]
   : [{addSheet:{properties:{sheetId,title:report.title,gridProperties}}}];
  // Remove the previous export's layout before rebuilding it, including when the report shrinks.
@@ -99,8 +97,12 @@ export function reportRequests(report, existing) {
   for(const band of existing.bandedRanges||[]) requests.push({deleteBanding:{bandedRangeId:band.bandedRangeId}});
  }
  requests.push({updateCells:{range:{sheetId},rows:report.rows.map(values=>({values:values.map(cell)})),fields:'userEnteredValue'}});
- requests.push({repeatCell:{range:{sheetId},cell:{userEnteredFormat:{textFormat:{fontFamily:'Arial',fontSize:11,foregroundColor:{red:0.15,green:0.2,blue:0.27}},verticalAlignment:'MIDDLE',wrapStrategy:'WRAP',padding:{top:6,bottom:6,left:8,right:8},numberFormat:{type:'NUMBER',pattern:'#,##0.###'}}},fields:'userEnteredFormat'}});
- for(let row=0;row<5;row++)requests.push({mergeCells:{range:{sheetId,startRowIndex:row,endRowIndex:row+1,startColumnIndex:0,endColumnIndex:8},mergeType:'MERGE_ALL'}});
+ requests.push({repeatCell:{range:{sheetId},cell:{userEnteredFormat:{textFormat:{fontFamily:'Arial',fontSize:10,foregroundColor:{red:0.15,green:0.2,blue:0.27}},verticalAlignment:'MIDDLE',wrapStrategy:'CLIP',padding:{top:4,bottom:4,left:7,right:7},numberFormat:{type:'NUMBER',pattern:'#,##0.###'}}},fields:'userEnteredFormat'}});
+ // Cabecera compacta: título, metadatos en una fila y una sola nota breve.
+ for(const row of [0,2])requests.push({mergeCells:{range:{sheetId,startRowIndex:row,endRowIndex:row+1,startColumnIndex:0,endColumnIndex:Math.min(8,columnCount)},mergeType:'MERGE_ALL'}});
+ requests.push({repeatCell:{range:{sheetId,startRowIndex:1,endRowIndex:2,startColumnIndex:0,endColumnIndex:6},cell:{userEnteredFormat:{backgroundColor:{red:0.96,green:0.97,blue:0.98}}},fields:'userEnteredFormat.backgroundColor'}});
+ for(const column of [0,2,4])requests.push({repeatCell:{range:{sheetId,startRowIndex:1,endRowIndex:2,startColumnIndex:column,endColumnIndex:column+1},cell:{userEnteredFormat:{textFormat:{bold:true,foregroundColor:{red:0.35,green:0.42,blue:0.5}}}},fields:'userEnteredFormat.textFormat'}});
+ requests.push({repeatCell:{range:{sheetId,startRowIndex:2,endRowIndex:3,startColumnIndex:0,endColumnIndex:Math.min(8,columnCount)},cell:{userEnteredFormat:{backgroundColor:{red:1,green:0.97,blue:0.92},textFormat:{italic:true,foregroundColor:{red:0.38,green:0.32,blue:0.24}},wrapStrategy:'WRAP'}},fields:'userEnteredFormat(backgroundColor,textFormat,wrapStrategy)'}});
  for(const table of report.tables) {
   requests.push({mergeCells:{range:{sheetId,startRowIndex:table.header-1,endRowIndex:table.header,startColumnIndex:0,endColumnIndex:table.columns},mergeType:'MERGE_ALL'}});
   requests.push({addBanding:{bandedRange:{range:{sheetId,startRowIndex:table.header,endRowIndex:table.end,startColumnIndex:0,endColumnIndex:table.columns},rowProperties:{headerColor:{red:0.89,green:0.93,blue:0.97},firstBandColor:{red:1,green:1,blue:1},secondBandColor:{red:0.96,green:0.97,blue:0.99}}}}});
@@ -110,13 +112,19 @@ export function reportRequests(report, existing) {
   requests.push({repeatCell:{range:{sheetId,startRowIndex,endRowIndex:startRowIndex+1},cell:{userEnteredFormat:{backgroundColor:{red:0.06,green:0.14,blue:0.22},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}}}},fields:'userEnteredFormat(backgroundColor,textFormat)'}});
   if (startRowIndex>0) requests.push({repeatCell:{range:{sheetId,startRowIndex:startRowIndex+1,endRowIndex:startRowIndex+2},cell:{userEnteredFormat:{backgroundColor:{red:0.9,green:0.94,blue:0.98},textFormat:{bold:true}}},fields:'userEnteredFormat(backgroundColor,textFormat)'}});
  }
- requests.push({repeatCell:{range:{sheetId,startRowIndex:0,endRowIndex:1},cell:{userEnteredFormat:{textFormat:{fontSize:18,bold:true,foregroundColor:{red:1,green:1,blue:1}}}},fields:'userEnteredFormat.textFormat'}});
- const widths=[145,300,190,185,125,145,145,145,145,145,160,160,155,145,200,180,170,170,300];
- requests.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:0,endIndex:columnCount},properties:{pixelSize:145},fields:'pixelSize'}});
+ requests.push({repeatCell:{range:{sheetId,startRowIndex:0,endRowIndex:1},cell:{userEnteredFormat:{textFormat:{fontSize:15,bold:true,foregroundColor:{red:1,green:1,blue:1}}}},fields:'userEnteredFormat.textFormat'}});
+ for(const table of report.tables)requests.push({repeatCell:{range:{sheetId,startRowIndex:table.header,endRowIndex:table.header+1,startColumnIndex:0,endColumnIndex:table.columns},cell:{userEnteredFormat:{horizontalAlignment:'CENTER',verticalAlignment:'MIDDLE',wrapStrategy:'WRAP'}},fields:'userEnteredFormat(horizontalAlignment,verticalAlignment,wrapStrategy)'}});
+ const widths=[120,280,165,170,110,125,125,125,125,125,145,145,140,120,175,165,155,155,260];
+ requests.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:0,endIndex:columnCount},properties:{pixelSize:125},fields:'pixelSize'}});
  widths.slice(0,columnCount).forEach((pixelSize,index)=>requests.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:index,endIndex:index+1},properties:{pixelSize},fields:'pixelSize'}}));
- requests.push({autoResizeDimensions:{dimensions:{sheetId,dimension:'ROWS',startIndex:0,endIndex:report.rows.length}}});
- for(const row of [0,...report.sections])requests.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:row,endIndex:row+1},properties:{pixelSize:44},fields:'pixelSize'}});
- for(const table of report.tables)requests.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:table.header,endIndex:table.header+1},properties:{pixelSize:48},fields:'pixelSize'}});
+ requests.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:0,endIndex:report.rows.length},properties:{pixelSize:27},fields:'pixelSize'}});
+ requests.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:0,endIndex:1},properties:{pixelSize:38},fields:'pixelSize'}});
+ requests.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:1,endIndex:2},properties:{pixelSize:30},fields:'pixelSize'}});
+ requests.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:2,endIndex:3},properties:{pixelSize:34},fields:'pixelSize'}});
+ // Las filas en blanco separan secciones sin crear grandes espacios vacíos.
+ for(const row of report.sections.map(row=>row-1))requests.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:row,endIndex:row+1},properties:{pixelSize:9},fields:'pixelSize'}});
+ for(const row of report.sections)requests.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:row,endIndex:row+1},properties:{pixelSize:31},fields:'pixelSize'}});
+ for(const table of report.tables)requests.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:table.header,endIndex:table.header+1},properties:{pixelSize:38},fields:'pixelSize'}});
  // Apply alerts as cell formats, without formulas or changes to exported values.
  report.rows.forEach((row,index)=>row.forEach((value,column)=>{
   const warning=value==='Bajo mínimo'||value==='Vencido'||value==='Vence en próximos 30 días';

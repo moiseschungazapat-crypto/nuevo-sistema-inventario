@@ -80,16 +80,22 @@ test('dos creaciones simultáneas reintentan sobre la misma pestaña sin duplica
 
 test('formato legible combina títulos, diferencia anchos y reemplaza las bandas de la exportación anterior',()=>{
  const report=buildReport(sample());
+ assert.equal(report.tables[0].header,5);
+ assert.deepEqual(report.rows[1].slice(0,6),['Fecha','20/10/2026','Actualizado (Perú)','20/10/2026, 23:59:00','Fuente','Supabase']);
+ assert.match(report.rows[2][0],/^Corte manual\./);
  const {requests}=reportRequests(report,{sheetId:99,bandedRanges:[{bandedRangeId:700}]});
  assert.ok(requests.some(r=>r.deleteBanding?.bandedRangeId===700));
  const unmerge=requests.findIndex(r=>r.unmergeCells);
  const write=requests.findIndex(r=>r.updateCells);
  assert.ok(unmerge>0 && unmerge<write);
  assert.equal(requests.filter(r=>r.addBanding).length,report.tables.length);
- assert.equal(requests[0].updateSheetProperties.properties.gridProperties.frozenRowCount,8);
+ assert.equal(requests[0].updateSheetProperties.properties.gridProperties.frozenRowCount,0);
  assert.equal(requests[0].updateSheetProperties.properties.gridProperties.frozenColumnCount,0);
  assert.ok(requests.some(r=>r.mergeCells?.range.startRowIndex===0 && r.mergeCells.range.endColumnIndex===8));
- assert.ok(requests.some(r=>r.updateDimensionProperties?.range.dimension==='COLUMNS' && r.updateDimensionProperties.properties.pixelSize===300));
+ assert.ok(requests.some(r=>r.updateDimensionProperties?.range.dimension==='COLUMNS' && r.updateDimensionProperties.properties.pixelSize===280));
+ assert.ok(requests.some(r=>r.updateDimensionProperties?.range.dimension==='ROWS' && r.updateDimensionProperties.properties.pixelSize===9));
+ assert.ok(requests.some(r=>r.repeatCell?.range.startRowIndex===2 && r.repeatCell.cell.userEnteredFormat.wrapStrategy==='WRAP'));
+ assert.ok(!requests.some(r=>r.autoResizeDimensions));
 });
 
 test('cuenta de servicio firma el acceso de Google sin enviar la clave privada',async()=>{
