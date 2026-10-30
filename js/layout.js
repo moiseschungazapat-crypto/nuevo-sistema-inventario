@@ -41,13 +41,31 @@ export function renderLayout() {
         });
     }
 
-    // 2. Nombre de usuario activo
+    // 2. Grupos del menú: solo uno permanece abierto y la sección activa se conserva visible.
+    const menuGroups = [...document.querySelectorAll('[data-menu-group]')];
+    for (const group of menuGroups) {
+        const button = group.querySelector('.menu-group-toggle');
+        button?.addEventListener('click', () => {
+            if (sidebar?.classList.contains('collapsed') && window.innerWidth > 768) {
+                sidebar.classList.remove('collapsed');
+                mainWrapper?.classList.remove('expanded');
+            }
+            const willOpen = !group.classList.contains('open');
+            for (const other of menuGroups) {
+                const open = other === group && willOpen;
+                other.classList.toggle('open', open);
+                other.querySelector('.menu-group-toggle')?.setAttribute('aria-expanded', String(open));
+            }
+        });
+    }
+
+    // 3. Nombre de usuario activo
     const userDisplayName = document.getElementById('user-display-name');
     sessionReady.then(session => {
         if (session && userDisplayName) userDisplayName.textContent = session.profile.nombre || 'Usuario';
     });
 
-    // 3. Menú Desplegable (User Dropdown)
+    // 4. Menú Desplegable (User Dropdown)
     const dropdownToggle = document.getElementById('user-dropdown-toggle');
     const userMenu = document.getElementById('user-menu');
 
@@ -64,7 +82,7 @@ export function renderLayout() {
         });
     }
 
-    // 4. Cerrar Sesión
+    // 5. Cerrar Sesión
     const handleLogout = async (e) => {
         if (e) e.preventDefault();
         const button = e?.currentTarget;

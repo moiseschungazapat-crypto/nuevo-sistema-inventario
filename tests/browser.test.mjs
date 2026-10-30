@@ -36,6 +36,13 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
     assert.equal(await page.locator('.menu-item.active').getAttribute('href'),(['productos','categorias'].includes(section)?'catalogo':section)+'.html');
     assert.equal(await page.locator('#load-error:visible').count(),0);
    }
+   await page.goto(base+'/dashboard.html');await page.locator('#sync-state.connected').waitFor();
+   assert.equal(await page.locator('.menu-group-toggle').count(),2);
+   await page.locator('[data-menu-group=settings] .menu-group-toggle').click();
+   assert.equal(await page.locator('[data-menu-group=settings]').evaluate(node=>node.classList.contains('open')),true);
+   await page.locator('[data-menu-group=administration] .menu-group-toggle').click();
+   assert.equal(await page.locator('[data-menu-group=settings]').evaluate(node=>node.classList.contains('open')),false);
+   assert.equal(await page.locator('[data-menu-group=administration] .menu-group-toggle').getAttribute('aria-expanded'),'true');
   });
   await t.test('categorías guarda y actualiza datos',async()=>{
    await page.goto(base+'/categorias.html');await page.locator('#new-category').click();

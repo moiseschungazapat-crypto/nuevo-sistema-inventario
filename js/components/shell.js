@@ -1,18 +1,29 @@
 import '../theme.js';
 import { setupMotion } from '../motion.js';
 
-const sections = [
- ['dashboard','Dashboard','house'], ['catalogo','Catálogo','boxes-stacked'],
- ['proveedores','Proveedores','truck'], ['sedes','Sedes','building'], ['recepciones','Recepciones','cart-shopping'], ['inventario','Inventario','boxes-stacked'],
- ['movimientos','Movimientos','arrow-right-arrow-left'], ['reportes','Reportes','chart-line'], ['auditoria','Auditoría','clipboard-list'], ['usuarios','Usuarios','users'],
+const primarySections = [
+ ['dashboard','Inicio','house'], ['recepciones','Recepciones','cart-shopping'], ['inventario','Inventario','boxes-stacked'],
+ ['movimientos','Movimientos','arrow-right-arrow-left'], ['reportes','Reportes','chart-line'],
 ];
+const sectionGroups = [
+ {id:'settings',label:'Configuración',icon:'gear',children:[['catalogo','Catálogo','boxes-stacked'],['proveedores','Proveedores','truck'],['sedes','Sedes','building']]},
+ {id:'administration',label:'Administración',icon:'diamond',children:[['auditoria','Auditoría','clipboard-list'],['usuarios','Usuarios','users']]},
+];
+const sectionLink = ([key,label,icon],section,submenu=false) => `<a href="${key}.html" class="menu-item ${submenu?'submenu-item ':''}${key===section?'active':''}" ${key===section?'aria-current="page"':''}><i class="fa-solid fa-${icon}" aria-hidden="true"></i><span>${label}</span></a>`;
+const sectionGroup = (group,section) => {
+ const open=group.children.some(([key])=>key===section);
+ return `<div class="menu-group ${open?'open has-active':''}" data-menu-group="${group.id}">
+  <button type="button" class="menu-item menu-group-toggle" aria-expanded="${open}" aria-controls="menu-${group.id}"><i class="fa-solid fa-${group.icon}" aria-hidden="true"></i><span class="menu-group-label">${group.label}</span><i class="fa-solid fa-chevron-down menu-caret" aria-hidden="true"></i></button>
+  <div class="submenu" id="menu-${group.id}">${group.children.map(item=>sectionLink(item,section,true)).join('')}</div>
+ </div>`;
+};
 export function mountShell() {
  const section = document.body.dataset.section;
  document.getElementById('app-root').innerHTML = `
  <div class="app-layout" hidden>
  <aside class="sidebar">
  <div class="sidebar-brand"><span class="sidebar-logo-wrap"><img src="img/logo.png" alt="" class="brand-logo"></span><span class="brand-copy"><span class="brand-name">LA LIGURIA S.A.</span><small>Gestión de inventario</small></span><button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-label="Colapsar menú"><i class="fa-solid fa-bars"></i></button></div>
- <nav class="sidebar-menu" aria-label="Menú principal">${sections.map(([key,label,icon])=>`<a href="${key}.html" class="menu-item ${key===section?'active':''}" ${key===section?'aria-current="page"':''}><i class="fa-solid fa-${icon}" aria-hidden="true"></i><span>${label}</span></a>`).join('')}</nav>
+ <nav class="sidebar-menu" aria-label="Menú principal"><div class="menu-primary">${primarySections.map(item=>sectionLink(item,section)).join('')}</div><div class="menu-secondary">${sectionGroups.map(group=>sectionGroup(group,section)).join('')}</div></nav>
  <div class="sidebar-footer"><button id="btn-logout" class="btn-logout"><i class="fa-solid fa-power-off" aria-hidden="true"></i><span>Cerrar sesión</span></button></div>
  </aside>
  <div class="main-wrapper">
