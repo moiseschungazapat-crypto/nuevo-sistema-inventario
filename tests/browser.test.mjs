@@ -107,7 +107,7 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
     assert.match(file.suggestedFilename(),/^inventario-diario-\d{4}-\d{2}-\d{2}\.xlsx$/);
     const path=resolve(root,'test-results/inventario-diario.xlsx');await file.saveAs(path);
     const text=(await readFile(path)).toString('utf8');
-    assert.match(text,/26 registros/);assert.match(text,/row r="32"/);
+    assert.match(text,/26 registros/);assert.match(text,/row r="32"/);assert.doesNotMatch(text,/<pane\b|state="frozen"/);
     await page.locator('#search').fill('No existe este producto');
     const emptyDownload=page.waitForEvent('download');await page.locator('#export-daily-stock').click();
     await (await emptyDownload).saveAs(path);
@@ -216,10 +216,12 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    const download=page.waitForEvent('download');await page.locator('#export-movements').click();
    const movements=await download;
    assert.equal(movements.suggestedFilename(),'movimientos.xlsx');
-   await movements.saveAs(resolve(root,'test-results/movimientos.xlsx'));
+   const movementsPath=resolve(root,'test-results/movimientos.xlsx');await movements.saveAs(movementsPath);
+   assert.doesNotMatch((await readFile(movementsPath)).toString('utf8'),/<pane\b|state="frozen"/);
    const stockDownload=page.waitForEvent('download');await page.locator('#export-stock').click();
    const stock=await stockDownload;assert.equal(stock.suggestedFilename(),'existencias.xlsx');
-   await stock.saveAs(resolve(root,'test-results/existencias.xlsx'));
+   const stockPath=resolve(root,'test-results/existencias.xlsx');await stock.saveAs(stockPath);
+   assert.doesNotMatch((await readFile(stockPath)).toString('utf8'),/<pane\b|state="frozen"/);
   });
   await t.test('Dashboard confirma el envío manual a Google Sheets e informa éxito o configuración pendiente',async()=>{
    await page.goto(base+'/dashboard.html');
