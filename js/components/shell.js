@@ -10,13 +10,13 @@ export function mountShell() {
  document.getElementById('app-root').innerHTML = `
  <div class="app-layout" hidden>
  <aside class="sidebar">
- <div class="sidebar-brand"><img src="img/logo.png" alt="" class="brand-logo"><span class="brand-name">LA LIGURIA S.A.</span><button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-label="Colapsar menú"><i class="fa-solid fa-bars"></i></button></div>
+ <div class="sidebar-brand"><span class="sidebar-logo-wrap"><img src="img/logo.png" alt="" class="brand-logo"></span><span class="brand-copy"><span class="brand-name">LA LIGURIA S.A.</span><small>Gestión de inventario</small></span><button type="button" id="sidebar-toggle" class="sidebar-toggle" aria-label="Colapsar menú"><i class="fa-solid fa-bars"></i></button></div>
  <nav class="sidebar-menu" aria-label="Menú principal">${sections.map(([key,label,icon])=>`<a href="${key}.html" class="menu-item ${key===section?'active':''}" ${key===section?'aria-current="page"':''}><i class="fa-solid fa-${icon}" aria-hidden="true"></i><span>${label}</span></a>`).join('')}</nav>
  <div class="sidebar-footer"><button id="btn-logout" class="btn-logout"><i class="fa-solid fa-power-off" aria-hidden="true"></i><span>Cerrar sesión</span></button></div>
  </aside>
  <div class="main-wrapper">
  <header class="top-navbar"><div class="navbar-left"><button id="toggle-sidebar" class="btn-toggle" aria-label="Abrir o cerrar menú"><i class="fa-solid fa-bars"></i></button><span class="navbar-title">INVENTARIO DE LA LIGURIA</span></div>
- <div class="account"><button type="button" id="theme-toggle" class="theme-toggle" aria-label="Cambiar a modo oscuro" aria-pressed="false"><i class="fa-solid fa-moon" data-theme-icon aria-hidden="true"></i><span data-theme-label>Modo oscuro</span></button><span id="sync-state" class="sync-state">Conectando…</span><span id="user-display-name">Usuario</span><span id="user-role" class="badge-blue"></span></div></header>
+ <div class="account"><button type="button" id="theme-toggle" class="theme-toggle" aria-label="Cambiar a modo oscuro" aria-pressed="false"><i class="fa-solid fa-moon" data-theme-icon aria-hidden="true"></i><span data-theme-label>Modo oscuro</span></button><span id="sync-state" class="sync-state">Conectando…</span><span class="user-chip"><span class="user-avatar" aria-hidden="true"><i class="fa-solid fa-user"></i></span><span class="user-copy"><span id="user-display-name">Usuario</span><span id="user-role" class="badge-blue"></span></span></span></div></header>
  <main class="content-body" id="page-content"><div class="loading">Cargando sección…</div></main>
  <footer class="app-footer">LA LIGURIA S.A. · Inventario de La Liguria</footer>
  </div></div>
