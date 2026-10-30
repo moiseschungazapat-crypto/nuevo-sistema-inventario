@@ -17,8 +17,10 @@ export function renderLayout() {
     if (!overlay) {
         overlay = document.createElement('div');
         overlay.className = 'sidebar-overlay';
-        document.body.appendChild(overlay);
     }
+    // La capa debe compartir el contexto visual de la aplicación. Fuera de él
+    // puede quedar por encima del sidebar y bloquear sus enlaces en móviles.
+    (document.querySelector('.app-layout') || document.body).appendChild(overlay);
 
     if (sidebar && (toggleBtn || sidebarToggle)) {
         const toggleSidebar = (e) => {

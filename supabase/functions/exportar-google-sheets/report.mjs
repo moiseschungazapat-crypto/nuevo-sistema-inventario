@@ -2,7 +2,6 @@ export const SPREADSHEET_ID = '1QVy5osOgq0pY998nS1CKJ8NXWtk5fuKKzWcBcgIPmTE';
 const id = value => String(value ?? '');
 const num = value => Number(value ?? 0);
 const round = value => Math.round(value * 1000) / 1000;
-const state = value => value === false ? 'Inactivo' : 'Activo';
 const types = {entrada:'Entrada',salida:'Salida',traslado:'Traslado',ajuste_positivo:'Ajuste positivo',ajuste_negativo:'Ajuste negativo'};
 export function limaDate(value) {
  return new Intl.DateTimeFormat('sv-SE', {timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
@@ -16,7 +15,6 @@ export function buildReport(data) {
  const products = new Map(data.products.map(p => [id(p.id),p]));
  const providers = new Map(data.providers.map(p => [id(p.id),p]));
  const sites = new Map(data.sites.map(s => [id(s.id),s]));
- const categories = new Map(data.categories.map(c => [id(c.id),c.nombre]));
  const receptions = new Map(data.receptions.map(r => [id(r.id),r]));
  const balances = new Map();
  const key = (p,s) => JSON.stringify([id(p),id(s)]);
@@ -42,7 +40,8 @@ export function buildReport(data) {
  }
  const rows = [], sections = [], tables = [];
  const add = (...values) => rows.push(values);
- const section = (name,headers,content) => {
+ const section = (name,headers,content,{omitWhenEmpty=false}={}) => {
+  if (omitWhenEmpty && !content.length) return null;
   add(); sections.push(rows.length); add(name); const header = rows.length; add(...headers);
   if (content.length) content.forEach(row => add(...row)); else add('Sin registros');
   tables.push({header,end:rows.length,columns:headers.length});
@@ -51,24 +50,32 @@ export function buildReport(data) {
  const time = value => new Date(value).toLocaleString('es-PE',{timeZone:'America/Lima',hour12:false});
  add('LA LIGURIA S.A. — REPORTE DIARIO');
  add('Fecha',title,'Actualizado (Perú)',time(data.generated_at),'Fuente','Supabase');
- add('Corte manual. Saldo inicial = saldo al corte menos los movimientos netos del día. Actualiza nuevamente al cierre.');
- section('EXISTENCIAS POR PRODUCTO Y SEDE',['Código','Producto','Categoría','Sede','Unidad','Stock inicial','Entradas','Salidas','Ajustes (+)','Ajustes (−)','Traslados recibidos','Traslados enviados','Stock al corte','Mínimo','Estado'],
-  [...balances.values()].map(b => {
+ add('Corte manual. Se muestran productos con saldo, mínimo configurado o actividad del día.');
+ const balanceRows=[...balances.values()].filter(b=>b.stock!==0||b.min>0||b.entrada+b.salida+b.positive+b.negative+b.transferIn+b.transferOut>0);
+ const alertRows=data.stock.map(s => {
+  if(num(s.cantidad)<=0||!s.vencimiento)return null;
+  const days=(new Date(s.vencimiento+'T00:00:00Z')-new Date(data.date+'T00:00:00Z'))/86400000;
+  const alert=s.vencimiento<data.date?'Vencido':days<=30?'Vence en próximos 30 días':null;
+  return alert?[s.codigo,s.producto,s.sede,s.lote,s.vencimiento,num(s.cantidad),s.unidad_medida,alert]:null;
+ }).filter(Boolean);
+ section('RESUMEN DEL DÍA',['Productos con stock','Bajo mínimo','Movimientos','Recepciones','Lotes vencidos','Lotes por vencer'],[[
+  new Set([...balances.values()].filter(b=>b.stock>0).map(b=>b.p)).size,
+  new Set([...balances.values()].filter(b=>b.min>0&&b.stock<b.min).map(b=>b.p)).size,
+  data.movements.length,data.receptions.length,
+  alertRows.filter(r=>r[7]==='Vencido').length,alertRows.filter(r=>r[7]==='Vence en próximos 30 días').length,
+ ]]);
+ section('EXISTENCIAS RELEVANTES',['Código','Producto','Sede','Unidad','Stock inicial','Entradas','Salidas','Ajuste neto','Traslado neto','Stock actual','Mínimo','Estado'],
+  balanceRows.map(b => {
    const p=products.get(b.p)||{}, s=sites.get(b.s)||{};
    const net=b.entrada-b.salida+b.positive-b.negative+b.transferIn-b.transferOut;
-   return [p.codigo,p.nombre,categories.get(id(p.categoria_id))||'Sin categoría',s.nombre,p.unidad_medida,round(b.stock-net),round(b.entrada),round(b.salida),round(b.positive),round(b.negative),round(b.transferIn),round(b.transferOut),round(b.stock),b.min,b.stock<b.min?'Bajo mínimo':'Normal'];
+   return [p.codigo,p.nombre,s.nombre,p.unidad_medida,round(b.stock-net),round(b.entrada),round(b.salida),round(b.positive-b.negative),round(b.transferIn-b.transferOut),round(b.stock),b.min,b.min>0&&b.stock<b.min?'Bajo mínimo':'Normal'];
   }));
  section('MOVIMIENTOS DEL DÍA',['Fecha y hora (Perú)','Tipo','Producto','Unidad','Lote','Sede origen','Sede destino','Cantidad','Responsable','Documento','Motivo'],
-  data.movements.map(m => [time(m.fecha),types[m.tipo],m.producto,m.unidad_medida,m.lote,m.sede,m.destino,num(m.cantidad),m.responsable,m.documento,m.motivo]));
- section('LOTES Y ALERTAS',['Código','Producto','Sede','Lote','Vencimiento','Cantidad','Unidad','Alerta'],data.stock.map(s => [s.codigo,s.producto,s.sede,s.lote,s.vencimiento,num(s.cantidad),s.unidad_medida,
-  num(s.cantidad)<=0?'Sin existencias':!s.vencimiento?'Sin vencimiento':s.vencimiento<data.date?'Vencido':(new Date(s.vencimiento+'T00:00:00Z')-new Date(data.date+'T00:00:00Z'))/86400000<=30?'Vence en próximos 30 días':'Vigente']));
- section('RECEPCIONES DEL DÍA',['ID','Fecha recepción','Fecha emisión','Proveedor','Documento','Sede','Responsable','Moneda','Subtotal','Descuento','IGV','Total','Estado pago','Forma pago','Condición pago','Vencimiento pago','Guía','Orden compra','Observaciones'],
-  data.receptions.map(r => [r.id,r.fecha_recepcion,r.fecha_emision,providers.get(id(r.proveedor_id))?.nombre,`${r.tipo_comprobante} ${r.serie}-${r.numero}`,sites.get(id(r.sede_id))?.nombre,r.responsable,r.moneda,r.subtotal,r.descuento,r.igv,r.total,r.estado_pago,r.forma_pago,r.condicion_pago,r.fecha_vencimiento_pago,r.guia_remision,r.orden_compra,r.observaciones]));
- section('DETALLE DE RECEPCIONES',['Recepción ID','Producto','Cantidad facturada','Cantidad recibida','Faltante','Unidad','Precio unitario','Moneda'],data.reception_lines.map(d => [d.recepcion_id,products.get(id(d.producto_id))?.nombre,num(d.cantidad_facturada),num(d.cantidad_recibida),round(num(d.cantidad_facturada)-num(d.cantidad_recibida)),d.unidad,d.precio_unitario,receptions.get(id(d.recepcion_id))?.moneda]));
- section('CATÁLOGO DE PRODUCTOS',['Código','Producto','Categoría','Unidad','Tipo','Controla stock','Precio referencia','Estado','Marca','Presentación'],data.products.map(p => [p.codigo,p.nombre,categories.get(id(p.categoria_id))||'Sin categoría',p.unidad_medida,p.tipo_item||'producto',p.controla_inventario===false?'No':'Sí',p.precio_confirmado? p.precio:null,state(p.estado),p.marca,p.presentacion]));
- section('PROVEEDORES',['Nombre','Documento','Contacto','Teléfono','Correo','Dirección','Estado'],data.providers.map(p => [p.nombre,p.documento,p.contacto,p.telefono,p.email,p.direccion,state(p.estado)]));
- section('CATEGORÍAS',['Nombre','Descripción','Estado'],data.categories.map(c => [c.nombre,c.descripcion,state(c.estado)]));
- section('SEDES',['Nombre','Dirección','Responsable','Estado'],data.sites.map(s => [s.nombre,s.direccion,s.responsable,state(s.estado)]));
+  data.movements.map(m => [time(m.fecha),types[m.tipo],m.producto,m.unidad_medida,m.lote,m.sede,m.destino,num(m.cantidad),m.responsable,m.documento,m.motivo]),{omitWhenEmpty:true});
+ section('ALERTAS DE LOTES',['Código','Producto','Sede','Lote','Vencimiento','Cantidad','Unidad','Alerta'],alertRows,{omitWhenEmpty:true});
+ section('RECEPCIONES DEL DÍA',['Fecha','Proveedor','Documento','Responsable','Moneda','Total','Estado de pago','Forma de pago'],
+  data.receptions.map(r => [r.fecha_recepcion,providers.get(id(r.proveedor_id))?.nombre,`${r.tipo_comprobante} ${r.serie}-${r.numero}`,r.responsable,r.moneda,r.total,r.estado_pago,r.forma_pago]),{omitWhenEmpty:true});
+ section('PRODUCTOS RECIBIDOS',['Recepción ID','Producto','Facturado','Recibido','Faltante','Unidad','Precio unitario','Moneda'],data.reception_lines.map(d => [d.recepcion_id,products.get(id(d.producto_id))?.nombre,num(d.cantidad_facturada),num(d.cantidad_recibida),round(num(d.cantidad_facturada)-num(d.cantidad_recibida)),d.unidad,d.precio_unitario,receptions.get(id(d.recepcion_id))?.moneda]),{omitWhenEmpty:true});
  return {title,rows,sections,tables};
 }
 
@@ -93,6 +100,7 @@ export function reportRequests(report, existing) {
   : [{addSheet:{properties:{sheetId,title:report.title,gridProperties}}}];
  // Remove the previous export's layout before rebuilding it, including when the report shrinks.
  if(existing) {
+  requests.push({clearBasicFilter:{sheetId}});
   requests.push({unmergeCells:{range:{sheetId}}});
   for(const band of existing.bandedRanges||[]) requests.push({deleteBanding:{bandedRangeId:band.bandedRangeId}});
  }

@@ -249,6 +249,10 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    await page.setViewportSize({width:390,height:844});await page.goto(base+'/inventario.html');
    await page.locator('#export-daily-stock').waitFor();await page.locator('#toggle-sidebar').click();
    assert.equal(await page.locator('.sidebar').evaluate(el=>el.classList.contains('show-mobile')),true);
+   await page.locator('.sidebar a[href="recepciones.html"]').click();
+   await page.waitForURL(/\/recepciones\.html$/);await page.locator('#new-reception').waitFor();
+   await page.goto(base+'/inventario.html');await page.locator('#export-daily-stock').waitFor();await page.locator('#toggle-sidebar').click();
+   assert.equal(await page.locator('.sidebar').evaluate(el=>el.classList.contains('show-mobile')),true);
    await page.locator('.sidebar-overlay').click({position:{x:360,y:600}});
    await page.screenshot({path:resolve(root,'test-results/inventario-mobile.png'),fullPage:true});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
