@@ -1,4 +1,5 @@
 import '../theme.js';
+import { setupMotion } from '../motion.js';
 
 const sections = [
  ['dashboard','Dashboard','house'], ['catalogo','Catálogo','boxes-stacked'],
@@ -22,4 +23,5 @@ export function mountShell() {
  </div></div>
  <div id="notice" role="status" aria-live="polite" hidden></div>
  <dialog id="editor"><form id="editor-form"><header class="dialog-header"><h2 id="editor-title"></h2><button type="button" class="button icon-only" id="close-editor" aria-label="Cerrar">×</button></header><div id="editor-fields" class="form-grid"></div><p id="editor-error" role="alert" class="form-error"></p><footer class="dialog-footer"><button type="button" class="button" id="cancel-editor">Cancelar</button><button type="submit" class="button primary" id="save-editor">Guardar</button></footer></form></dialog>`;
+ setupMotion();
 }

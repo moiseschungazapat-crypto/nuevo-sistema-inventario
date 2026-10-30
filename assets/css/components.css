@@ -172,3 +172,27 @@ html[data-theme="dark"] .sidebar{background:linear-gradient(180deg,#101b2b,#0d17
 html[data-theme="dark"] .sidebar-logo-wrap{background:linear-gradient(145deg,#1b3144,#102132)}html[data-theme="dark"] .brand-copy small{color:#8196ac}html[data-theme="dark"] .user-chip{background:#101d2d;border-color:#2a3c52}html[data-theme="dark"] .user-copy #user-display-name{color:#ecf4fc}html[data-theme="dark"] .toolbar{background:linear-gradient(120deg,#101c2c,#132033);border-color:#26384e}html[data-theme="dark"] .table-scroll{border-color:#26384e}
 @media(max-width:768px){.app-layout::before{inset:60px 0 0}.top-navbar{height:62px}.user-chip{padding:4px}.user-copy{display:none}.page-heading h1{font-size:25px}.panel:hover,.card-box:hover,.kpi-card:hover{transform:none}.toolbar{padding:10px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.content-body,.kpi-grid .kpi-card,.activity-track>div,dialog,dialog::backdrop,.notice,.sidebar-logo-wrap::after,.loading::before{animation:none!important}.panel,.card-box,.kpi-card,.button,.menu-item{transition:none!important}}
+
+/* Movimiento progresivo compartido por todas las secciones */
+.motion-ready{transform:translateY(13px);transition:transform .48s cubic-bezier(.2,.72,.32,1);transition-delay:var(--motion-delay,0ms);will-change:transform}
+.motion-ready.motion-visible{transform:none;will-change:auto}
+.page-heading.motion-ready::after{width:0;transition:width .62s .18s cubic-bezier(.2,.72,.32,1)}
+.page-heading.motion-visible::after{width:64px}
+.data-table tbody tr{animation:tableRowIn .38s cubic-bezier(.2,.72,.32,1) both}
+.data-table tbody tr:nth-child(2){animation-delay:35ms}.data-table tbody tr:nth-child(3){animation-delay:70ms}.data-table tbody tr:nth-child(4){animation-delay:105ms}.data-table tbody tr:nth-child(5){animation-delay:140ms}.data-table tbody tr:nth-child(n+6){animation-delay:175ms}
+.form-grid .field{animation:fieldIn .3s cubic-bezier(.2,.72,.32,1) both}.form-grid .field:nth-child(2){animation-delay:35ms}.form-grid .field:nth-child(3){animation-delay:70ms}.form-grid .field:nth-child(4){animation-delay:105ms}.form-grid .field:nth-child(n+5){animation-delay:130ms}
+details[open]>:not(summary){animation:detailOpen .3s cubic-bezier(.2,.72,.32,1) both}
+details summary{transition:color .2s ease,transform .2s ease}details summary:hover{color:#b96f3e;transform:translateX(2px)}
+.pill{transition:transform .18s ease,box-shadow .18s ease}.pill:hover{transform:translateY(-1px);box-shadow:0 5px 12px rgba(15,35,56,.09)}
+.actions .button i,.button i{transition:transform .2s ease}.button:hover:not(:disabled) i{transform:translateX(2px)}
+.catalog-tab.primary{animation:tabSelect .28s cubic-bezier(.2,.72,.32,1) both}
+.alert-item{transition:transform .2s ease,background-color .2s ease}.alert-item:hover{transform:translateX(3px)}
+.sidebar.show-mobile{animation:mobileMenuIn .28s cubic-bezier(.2,.72,.32,1) both}.sidebar-overlay.active{animation:overlayReveal .2s ease both}
+@keyframes tableRowIn{from{transform:translateX(7px)}to{transform:none}}
+@keyframes fieldIn{from{transform:translateY(7px)}to{transform:none}}
+@keyframes detailOpen{from{opacity:.65;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes tabSelect{from{transform:translateY(3px)}to{transform:none}}
+@keyframes mobileMenuIn{from{transform:translateX(-100%)}to{transform:translateX(0)}}
+@keyframes overlayReveal{from{opacity:0}to{opacity:1}}
+@media(max-width:768px){.motion-ready{transform:translateY(8px);transition-duration:.34s}}
+@media(prefers-reduced-motion:reduce){.motion-ready,.motion-ready.motion-visible{transform:none!important;transition:none!important}.data-table tbody tr,.form-grid .field,details[open]>:not(summary),.catalog-tab.primary,.sidebar.show-mobile,.sidebar-overlay.active{animation:none!important}}
