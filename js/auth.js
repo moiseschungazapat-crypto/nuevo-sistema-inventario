@@ -1,8 +1,10 @@
 import { authService } from './services/session.js';
 import { authMessage } from './services/auth-service.js';
 import { setStatus, setupPasswordToggle } from './utils/auth-ui.js';
+import { setupThemeToggle } from './theme.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    setupThemeToggle();
     const form = document.getElementById('form-login');
     const email = document.getElementById('email');
     const password = document.getElementById('password');
