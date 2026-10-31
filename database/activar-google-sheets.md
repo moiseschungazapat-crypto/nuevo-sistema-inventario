@@ -1,6 +1,6 @@
 # Activar el reporte manual de Google Sheets
 
-El botón **Actualizar Google Sheets** aparece en el Dashboard para administradores. Después de confirmar, crea o reemplaza la pestaña del día (por ejemplo `20/10/2026`), usando la hora de Perú. Las pestañas de días anteriores se conservan.
+El botón **Actualizar Google Sheets** aparece en el Dashboard para administradores. Después de confirmar, elige el archivo del mes correspondiente y crea o reemplaza la pestaña del día (por ejemplo `20/10/2026`), usando la hora de Perú. Las pestañas de días anteriores se conservan dentro de su archivo mensual.
 
 Archivo configurado: https://docs.google.com/spreadsheets/d/1QVy5osOgq0pY998nS1CKJ8NXWtk5fuKKzWcBcgIPmTE/edit
 
@@ -34,7 +34,11 @@ No envíes el JSON por chat, no lo subas a Git y no lo pegues en los archivos Ja
 | Nombre | Valor |
 | --- | --- |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Contenido completo del JSON descargado de Google. |
-| `GOOGLE_SHEETS_SPREADSHEET_ID` | `1QVy5osOgq0pY998nS1CKJ8NXWtk5fuKKzWcBcgIPmTE` |
+| `GOOGLE_SHEETS_MONTHLY_IDS` | `{"2026-10":"1QVy5osOgq0pY998nS1CKJ8NXWtk5fuKKzWcBcgIPmTE","2026-11":"1uyjGevQSas_8xPxHDqZs6cQywDf8s0QZXSpoT8t3la4"}` |
+
+Cada archivo mensual debe estar compartido como **Editor** con la misma cuenta de servicio. Antes de iniciar un mes nuevo, crea el archivo, compártelo y agrega su identificador al objeto `GOOGLE_SHEETS_MONTHLY_IDS`. Si el mes no está configurado, la exportación se detiene con un aviso claro; nunca escribe el reporte en el archivo del mes anterior.
+
+`GOOGLE_SHEETS_SPREADSHEET_ID` se conserva solo como compatibilidad para instalaciones antiguas que todavía no usan la configuración mensual.
 
 `SUPABASE_URL` y `SUPABASE_ANON_KEY` son variables proporcionadas por el entorno de Edge Functions. No se requiere una clave `service_role`. La función verifica la identidad de la sesión y el rol de administrador antes de exportar.
 

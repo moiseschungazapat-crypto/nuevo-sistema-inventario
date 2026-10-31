@@ -3,6 +3,16 @@ import { googleToken, writeReport } from './google.mjs';
 
 const cors = {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS','Content-Type':'application/json; charset=utf-8'};
 const json = (body,status=200) => new Response(JSON.stringify(body),{status,headers:cors});
+export function resolveSpreadsheetId(date,env) {
+ const raw=env('GOOGLE_SHEETS_MONTHLY_IDS');
+ if (!raw) return env('GOOGLE_SHEETS_SPREADSHEET_ID')||SPREADSHEET_ID;
+ let monthly;
+ try { monthly=JSON.parse(raw); } catch { throw new Error('La configuración mensual de Google Sheets no tiene un formato válido.'); }
+ const month=String(date||'').slice(0,7), spreadsheetId=monthly?.[month];
+ if (!spreadsheetId) throw new Error('Falta configurar el archivo de Google Sheets para el mes '+month+'.');
+ if (!/^[A-Za-z0-9_-]{20,}$/.test(String(spreadsheetId))) throw new Error('La configuración mensual de Google Sheets contiene un archivo inválido.');
+ return String(spreadsheetId);
+}
 export function createHandler({createClient,env,request=fetch}) {
  return async req => {
   if (req.method==='OPTIONS') return new Response('ok',{headers:cors});
@@ -26,12 +36,12 @@ export function createHandler({createClient,env,request=fetch}) {
    if (error) return json({error:error.code==='42501'?'No tienes permiso para exportar.':'No se pudo preparar el reporte. Verifica que esté aplicada la migración de Google Sheets y vuelve a intentar.'},error.code==='42501'?403:503);
    const report=buildReport(data);
    const token=await googleToken(credentials,request);
-   const spreadsheetId=env('GOOGLE_SHEETS_SPREADSHEET_ID')||SPREADSHEET_ID;
+   const spreadsheetId=resolveSpreadsheetId(data.date,env);
    const {sheetId}=await writeReport(spreadsheetId,token,report,request);
    return json({date:data.date,title:report.title,updatedAt:data.generated_at,url:`https://docs.google.com/spreadsheets/d/${encodeURIComponent(spreadsheetId)}/edit#gid=${sheetId}`});
   } catch (error) {
    // Return only errors deliberately written by the integration, never Google's raw responses or secrets.
-   const safe = error instanceof Error && /^(Google |No se pudo |El reporte |La cuenta |Fecha de reporte |Faltan datos |Movimiento fuera |Tipo de movimiento |Número inválido)/.test(error.message);
+   const safe = error instanceof Error && /^(Google |No se pudo |El reporte |La cuenta |La configuración mensual |Falta configurar el archivo |Fecha de reporte |Faltan datos |Movimiento fuera |Tipo de movimiento |Número inválido)/.test(error.message);
    return json({error:safe?error.message:'No se pudo actualizar Google Sheets. Revisa la configuración o vuelve a intentar.'},502);
   }
  };

@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { PGlite } from '@electric-sql/pglite';
 import { buildReport, cell, limaDate, reportRequests } from '../supabase/functions/exportar-google-sheets/report.mjs';
 import { googleToken, writeReport } from '../supabase/functions/exportar-google-sheets/google.mjs';
-import { createHandler } from '../supabase/functions/exportar-google-sheets/handler.mjs';
+import { createHandler, resolveSpreadsheetId } from '../supabase/functions/exportar-google-sheets/handler.mjs';
 
 const sample = () => ({date:'2026-10-20',generated_at:'2026-10-21T04:59:00Z',
  products:[{id:1,codigo:'HAR',nombre:'Harina',unidad_medida:'kg',categoria_id:1,estado:true},{id:2,codigo:'SER',nombre:'Servicio',controla_inventario:false}],
@@ -118,6 +118,15 @@ test('cuenta de servicio firma el acceso de Google sin enviar la clave privada',
  assert.equal(token,'google-token');
 });
 
+test('cada mes usa su propio archivo y nunca cae silenciosamente en el mes anterior',()=>{
+ const ids={'2026-10':'october-sheet-1234567890','2026-11':'november-sheet-123456789'};
+ const env=name=>name==='GOOGLE_SHEETS_MONTHLY_IDS'?JSON.stringify(ids):name==='GOOGLE_SHEETS_SPREADSHEET_ID'?'legacy-sheet-1234567890':undefined;
+ assert.equal(resolveSpreadsheetId('2026-10-31',env),ids['2026-10']);
+ assert.equal(resolveSpreadsheetId('2026-11-01',env),ids['2026-11']);
+ assert.throws(()=>resolveSpreadsheetId('2026-12-01',env),/2026-12/);
+ assert.throws(()=>resolveSpreadsheetId('2026-11-01',name=>name==='GOOGLE_SHEETS_MONTHLY_IDS'?'{mal configurado':undefined),/formato válido/);
+});
+
 test('servidor exige identidad y administrador antes de leer datos o enviar a Google',async()=>{
  let role='consulta',valid=true,reads=0,googleCalls=0;
  const client={auth:{getUser:async()=>({data:{user:valid?{id:'u1'}:null}})},rpc:async name=>{
@@ -140,7 +149,7 @@ test('servidor completa un envío autorizado usando la sesión del usuario y dev
  const credentials={client_email:'reports@example.test',private_key:'-----BEGIN PRIVATE KEY-----\n'+Buffer.from(await crypto.subtle.exportKey('pkcs8',keys.privateKey)).toString('base64')+'\n-----END PRIVATE KEY-----'};
  const calls=[];
  const handler=createHandler({
-  env:name=>({SUPABASE_URL:'https://example.test',SUPABASE_ANON_KEY:'public-key',GOOGLE_SERVICE_ACCOUNT_JSON:JSON.stringify(credentials),GOOGLE_SHEETS_SPREADSHEET_ID:'sheet-test'}[name]),
+  env:name=>({SUPABASE_URL:'https://example.test',SUPABASE_ANON_KEY:'public-key',GOOGLE_SERVICE_ACCOUNT_JSON:JSON.stringify(credentials),GOOGLE_SHEETS_SPREADSHEET_ID:'legacy-sheet-test',GOOGLE_SHEETS_MONTHLY_IDS:JSON.stringify({'2026-10':'monthly-sheet-test-123456789'})}[name]),
   createClient:(url,key,options)=>{
    assert.equal(key,'public-key');assert.equal(options.global.headers.Authorization,'Bearer user-jwt');
    return {auth:{getUser:async()=>({data:{user:{id:'u1'}}})},rpc:async name=>{
@@ -157,7 +166,7 @@ test('servidor completa un envío autorizado usando la sesión del usuario y dev
  const response=await handler(new Request('https://example.test',{method:'POST',headers:{Authorization:'Bearer user-jwt'}}));
  assert.equal(response.status,200);
  const data=await response.json();
- assert.equal(data.title,'20/10/2026');assert.match(data.url,/sheet-test\/edit#gid=20261020$/);
+ assert.equal(data.title,'20/10/2026');assert.match(data.url,/monthly-sheet-test-123456789\/edit#gid=20261020$/);
  assert.deepEqual(calls,['app_mi_acceso','app_reporte_google_sheets']);
  assert.ok(!JSON.stringify(data).includes('PRIVATE KEY'));
 });
