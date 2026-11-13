@@ -6,6 +6,8 @@ const migrationPath = new URL('../supabase/migrations/202611130015_catalogo_oper
 const sql = await fs.readFile(migrationPath, 'utf8');
 const cleanupPath = new URL('../supabase/migrations/202611130016_retirar_productos_fuera_catalogo.sql', import.meta.url);
 const cleanupSql = await fs.readFile(cleanupPath, 'utf8');
+const resetPath = new URL('../supabase/migrations/202611130017_eliminar_datos_prueba_catalogo.sql', import.meta.url);
+const resetSql = await fs.readFile(resetPath, 'utf8');
 const productBlock = sql.match(/insert into app_catalogo_actualizado\([^)]+\) values\s*([\s\S]+?);\s*\n\s*do \$\$/i)?.[1] || '';
 const products = [...productBlock.matchAll(/\('([^']+)','((?:''|[^'])*)','((?:''|[^'])*)','(kg|litro|unidad)',(true|false)\)/g)]
  .map(match => ({code:match[1],name:match[2],category:match[3],unit:match[4]}));
@@ -44,4 +46,15 @@ test('la limpieza conserva historial y deja solo los 270 códigos vigentes activ
  }
  assert.match(cleanupSql,/set estado=false[\s\S]*not exists/i);
  assert.doesNotMatch(cleanupSql,/delete\s+from\s+public\.(lotes|inventario|inventario_minimos|movimientos|recepcion_detalles|proveedor_productos)/i);
+});
+
+test('el reinicio definitivo elimina solo datos operativos ajenos a los 270 códigos reales', () => {
+ const allowed = [...resetSql.matchAll(/\('([A-Z]-\d{3})'\)/g)].map(match => match[1]);
+ assert.equal(allowed.length, 270);
+ assert.equal(new Set(allowed).size, 270);
+ for (const table of ['movimientos','inventario','inventario_minimos','recepcion_detalles','proveedor_productos','lotes','productos','recepciones','categorias']) {
+  assert.match(resetSql,new RegExp(`delete from public\\.${table}\\b`,'i'),`Falta limpiar ${table}`);
+ }
+ assert.doesNotMatch(resetSql,/delete\s+from\s+(?:public\.)?(auth_perfiles|proveedores|sedes|auth\.users)/i);
+ assert.match(resetSql,/productos_totales[\s\S]*productos_catalogo_real[\s\S]*productos_fuera_lista[\s\S]*categorias_totales/i);
 });
