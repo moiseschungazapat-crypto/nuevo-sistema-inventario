@@ -91,12 +91,9 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    await page.locator('[name=minimo]').fill('10');await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();
    await page.locator('#editor').waitFor({state:'hidden'});
   });
-  await t.test('recepciones crea lotes e inventario solo permite consultar',async()=>{
-   await page.goto(base+'/recepciones.html');await page.locator('#manual-lots summary').click();await page.locator('#new-lot').click();
-   await page.locator('[name=producto_id]').selectOption('p1');await page.locator('[name=codigo]').fill('LOTE-NUEVO');
-   await page.locator('[name=vencimiento]').fill('2099-12-31');await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();
-   await page.locator('#editor').waitFor({state:'hidden'});
-   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('browser-test-database')).lotes.some(l=>l.codigo==='LOTE-NUEVO')),true);
+  await t.test('recepciones oculta la gestión manual de lotes e inventario solo permite consultar',async()=>{
+   await page.goto(base+'/recepciones.html');
+   assert.equal(await page.locator('#manual-lots, #new-lot').count(),0);
    await page.goto(base+'/inventario.html');await page.locator('[data-stock-detail]').first().waitFor();
    assert.equal(await page.locator('#new-lot, #minimum, a[href="movimientos.html"].primary').count(),0);
    await page.locator('[data-stock-detail]').first().click();
@@ -139,7 +136,7 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    try{
     await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem('browser-test-database'));d.productos[0].es_perecible=true;localStorage.setItem('browser-test-database',JSON.stringify(d));});
     await page.goto(base+'/recepciones.html');await page.locator('#new-reception').click();
-    await page.locator('[name=proveedor_id]').selectOption('pr1');await page.locator('[name=serie]').fill('F001');await page.locator('[name=numero]').fill('PERECIBLE-1');
+    await page.locator('[name=proveedor_id]').selectOption('pr1');
     await page.locator('[name=producto_0]').selectOption('p1');await page.locator('[name=recibida_0]').fill('20');
     assert.equal(await page.locator('[name=caducidad_0]').isDisabled(),true);
     await page.locator('[name=vencimiento_0]').fill('2099-10-31');
@@ -152,8 +149,9 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    await page.goto(base+'/recepciones.html');await page.locator('#new-reception').click();
    const snapshot=await page.evaluate(()=>localStorage.getItem('browser-test-database'));
    try{
-    await page.locator('[name=proveedor_id]').selectOption('pr1');await page.locator('[name=serie]').fill('F001');await page.locator('[name=numero]').fill('SIMPLE-1');
+    await page.locator('[name=proveedor_id]').selectOption('pr1');
     await page.locator('[name=producto_0]').selectOption('p1');await page.locator('[name=recibida_0]').fill('4');
+    await page.locator('[name=caducidad_0]').selectOption('fecha');
     await page.locator('[name=vencimiento_0]').fill('2099-12-31');
     assert.equal(await page.locator('[name=lote_0]').isVisible(),false);
     await page.locator('#add-reception-line').click();
