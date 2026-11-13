@@ -89,7 +89,6 @@ export async function receptionsPage(root, access) {
     field('fecha_recepcion','Fecha de recepción',{type:'date',required:true,value:limaToday(),help:'Día en que los productos llegaron al almacén.'})+
     field('responsable','Responsable de recepción',{required:true,maxLength:150,value:access.nombre||'',help:'Persona que verificó el ingreso.'})+
     field('observaciones','Observaciones del ingreso (opcional)',{type:'textarea',maxLength:1000,help:'Anota daños, diferencias u otra observación física.'})+
-    '<p class="muted full-width">La factura física se conserva fuera del sistema. Aquí solo se registra el ingreso real al inventario.</p>'+
     `<p class="muted full-width">Sede de recepción: ${e(operationalSiteLabel(mainSite))}</p>`+
     '<p class="muted full-width">Agrega cada producto recibido. El sistema creará sus lotes y actualizará las existencias automáticamente.</p>'+
     '<div id="reception-lines" class="full-width">'+line(0,true)+'</div>'+
