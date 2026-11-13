@@ -4,6 +4,8 @@ import test from 'node:test';
 
 const migrationPath = new URL('../supabase/migrations/202611130015_catalogo_operativo_actualizado.sql', import.meta.url);
 const sql = await fs.readFile(migrationPath, 'utf8');
+const cleanupPath = new URL('../supabase/migrations/202611130016_retirar_productos_fuera_catalogo.sql', import.meta.url);
+const cleanupSql = await fs.readFile(cleanupPath, 'utf8');
 const productBlock = sql.match(/insert into app_catalogo_actualizado\([^)]+\) values\s*([\s\S]+?);\s*\n\s*do \$\$/i)?.[1] || '';
 const products = [...productBlock.matchAll(/\('([^']+)','((?:''|[^'])*)','((?:''|[^'])*)','(kg|litro|unidad)',(true|false)\)/g)]
  .map(match => ({code:match[1],name:match[2],category:match[3],unit:match[4]}));
@@ -30,4 +32,16 @@ test('la actualización no borra catálogo ni crea saldos o movimientos', () => 
  assert.match(sql, /where lower\(btrim\(p\.codigo\)\)=lower\(btrim\(r\.codigo\)\)/i);
  assert.match(sql, /commit;\s*-- Verificación independiente:/i);
  assert.doesNotMatch(sql, /commit;[\s\S]*select[\s\S]*from app_catalogo_actualizado/i);
+});
+
+test('la limpieza conserva historial y deja solo los 270 códigos vigentes activos', () => {
+ const allowed = [...cleanupSql.matchAll(/\('([A-Z]-\d{3})'\)/g)].map(match => match[1]);
+ assert.equal(allowed.length, 270);
+ assert.equal(new Set(allowed).size, 270);
+ assert.match(cleanupSql, /delete from public\.productos p/i);
+ for (const relation of ['lotes','inventario','inventario_minimos','movimientos','recepcion_detalles','proveedor_productos']) {
+  assert.match(cleanupSql,new RegExp(`not exists \\(select 1 from public\\.${relation} `,'i'));
+ }
+ assert.match(cleanupSql,/set estado=false[\s\S]*not exists/i);
+ assert.doesNotMatch(cleanupSql,/delete\s+from\s+public\.(lotes|inventario|inventario_minimos|movimientos|recepcion_detalles|proveedor_productos)/i);
 });

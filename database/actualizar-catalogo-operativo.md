@@ -27,3 +27,15 @@ La migración `202611130015_catalogo_operativo_actualizado.sql` incorpora los 27
 5. Comprueba que la consulta final devuelva 270 productos.
 
 La migración usa una transacción. Si ocurre un error antes del `commit`, no se aplican cambios parciales.
+
+## Retirar el catálogo anterior
+
+Después de comprobar que los 270 códigos nuevos están cargados, ejecuta
+`supabase/migrations/202611130016_retirar_productos_fuera_catalogo.sql`.
+
+Esta segunda migración deja únicamente la lista nueva como catálogo activo:
+
+- Borra físicamente los productos anteriores que nunca fueron utilizados.
+- Los productos relacionados con lotes, existencias, recepciones o movimientos quedan inactivos y dejan de aparecer en el catálogo activo.
+- No elimina movimientos, recepciones ni trazabilidad histórica.
+- La consulta final debe mostrar `catalogo_nuevo_activo = 270` y `fuera_lista_activos = 0`.
