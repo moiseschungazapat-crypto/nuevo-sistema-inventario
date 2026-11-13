@@ -28,4 +28,6 @@ test('la actualización no borra catálogo ni crea saldos o movimientos', () => 
  assert.doesNotMatch(sql, /insert\s+into\s+public\.(inventario|lotes|movimientos)\b/i);
  assert.match(sql, /No elimina ni desactiva productos anteriores/i);
  assert.match(sql, /where lower\(btrim\(p\.codigo\)\)=lower\(btrim\(r\.codigo\)\)/i);
+ assert.match(sql, /commit;\s*-- Verificación independiente:/i);
+ assert.doesNotMatch(sql, /commit;[\s\S]*select[\s\S]*from app_catalogo_actualizado/i);
 });

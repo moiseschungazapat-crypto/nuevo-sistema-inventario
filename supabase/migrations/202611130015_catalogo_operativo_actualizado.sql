@@ -360,12 +360,13 @@ begin
  end loop;
 end $$;
 
--- Verificación: debe devolver 270 filas y no modifica las existencias.
+commit;
+
+-- Verificación independiente: debe devolver 270 filas y no modifica las existencias.
+-- No depende de la tabla temporal, que se elimina al confirmar la transacción.
 select p.codigo,p.nombre,c.nombre categoria,p.unidad_medida,p.es_perecible,p.estado
 from public.productos p
 join public.categorias c on c.id=p.categoria_id
-where lower(btrim(p.codigo)) in (select lower(btrim(codigo)) from app_catalogo_actualizado)
+where upper(btrim(p.codigo)) ~ '^(A|C|D|E|F|G|H|I|L|O|P|T)-[0-9]{3}$'
 order by p.codigo;
-
-commit;
 
