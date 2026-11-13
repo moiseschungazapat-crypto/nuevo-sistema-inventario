@@ -8,7 +8,7 @@ const limaToday = () => new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Lima'
 const limaDateTime = value => value ? new Intl.DateTimeFormat('es-PE',{timeZone:'America/Lima',dateStyle:'short',timeStyle:'medium'}).format(new Date(value)) : '—';
 
 export async function receptionsPage(root, access) {
- let rows = [], providers = [], products = [], sites = [], mainSite = null;
+ let rows = [], providers = [], categories = [], products = [], sites = [], mainSite = null;
  const canWrite = access.rol !== 'consulta';
  root.innerHTML = heading(
   'Recepciones',
@@ -29,8 +29,8 @@ export async function receptionsPage(root, access) {
 
  async function refresh() {
   try {
-   [providers,products,sites,rows] = await Promise.all([
-    allRows('proveedores'), allRows('productos'), allRows('sedes'), rpc('app_listar_recepciones')
+   [providers,categories,products,sites,rows] = await Promise.all([
+    allRows('proveedores'), allRows('categorias'), allRows('productos'), allRows('sedes'), rpc('app_listar_recepciones')
    ]);
    mainSite = operationalSite(sites);
    const siteError = operationalSiteError(sites);
@@ -41,7 +41,8 @@ export async function receptionsPage(root, access) {
 
  function line(index, required = false) {
   return `<div class="reception-line" data-reception-line data-index="${index}">
-   ${field('producto_'+index,'Producto',{required,choices:options(products.filter(product=>product.estado),'','Seleccionar…',productLabel),help:'Artículo que llegó al almacén.'})}
+   ${field('categoria_'+index,'Categoría',{required,choices:options(categories.filter(category=>category.estado),'','Seleccionar categoría…'),help:'Primero elige el grupo del producto.'})}
+   ${field('producto_'+index,'Producto',{required,choices:'<option value="">Primero elige una categoría…</option>',help:'Solo se mostrarán productos de la categoría elegida.'})}
    ${field('recibida_'+index,'Cantidad recibida',{type:'number',required,min:0.001,step:'0.001',help:'Cantidad física que estás ingresando.'})}
    <div class="reception-expiry">
     ${field('caducidad_'+index,'Vencimiento',{choices:'<option value="ninguno">Sin vencimiento</option><option value="fecha">Tiene vencimiento</option>'})}
@@ -53,11 +54,18 @@ export async function receptionsPage(root, access) {
  }
 
  function syncLine(lineNode) {
+  const categoryControl = lineNode.querySelector('[name^="categoria_"]');
   const productControl = lineNode.querySelector('[name^="producto_"]');
   const quantityControl = lineNode.querySelector('[name^="recibida_"]');
   const unitControl = lineNode.querySelector('[name^="unidad_"]');
   const modeControl = lineNode.querySelector('[name^="caducidad_"]');
   const expirationControl = lineNode.querySelector('[name^="vencimiento_"]');
+  const selectedProduct = productControl.value;
+  const categoryChanged = lineNode.dataset.category !== categoryControl.value;
+  const filteredProducts = products.filter(product=>product.estado && String(product.categoria_id)===categoryControl.value);
+  productControl.innerHTML = options(filteredProducts,categoryChanged?'':selectedProduct,categoryControl.value?'Seleccionar producto…':'Primero elige una categoría…',productLabel);
+  productControl.disabled = !categoryControl.value;
+  lineNode.dataset.category = categoryControl.value;
   const product = products.find(row=>String(row.id)===productControl.value);
   const changed = lineNode.dataset.product !== productControl.value;
   if (changed) {
