@@ -2,10 +2,10 @@ import { rpc } from '../services/data.js';
 import { heading,e,table,badge,loadError } from '../components/ui.js';
 import { quantity } from '../utils/domain.js';
 import { confirmAction } from '../components/confirmation.js';
-import { updateGoogleSheets, GOOGLE_SHEETS_URL } from '../services/google-sheets.js';
+import { updateGoogleSheets, syncInventorySheets, GOOGLE_SHEETS_URL, GOOGLE_INVENTORY_SHEETS_URL } from '../services/google-sheets.js';
 export async function overviewPage(root,access={}){
- root.innerHTML=heading('Inventario de La Liguria','Resumen de operación · Fechas y actividad en hora de Lima.',(access.rol==='administrador'?'<button type="button" class="button" id="update-google-sheets">Actualizar Google Sheets</button>':'')+'<a class="button" href="inventario.html">Ver existencias</a><a class="button primary" href="movimientos.html">Movimientos</a>')+
- (access.rol==='administrador'?'<div class="sheets-status" aria-live="polite"><span id="google-sheets-status">Reporte manual por fecha de Perú. Incluye existencias, movimientos, recepciones, alertas y catálogos.</span> <a class="text-link" href="'+GOOGLE_SHEETS_URL+'" target="_blank" rel="noopener noreferrer">Abrir hoja ↗</a></div>':'')+
+ root.innerHTML=heading('Inventario de La Liguria','Resumen de operación · Fechas y actividad en hora de Lima.',(access.rol==='administrador'?'<button type="button" class="button primary" id="sync-inventory-sheets">Sincronizar inventario</button><button type="button" class="button" id="update-google-sheets">Actualizar reporte diario</button>':'')+'<a class="button" href="inventario.html">Ver existencias</a><a class="button" href="movimientos.html">Movimientos</a>')+
+ (access.rol==='administrador'?'<div class="sheets-status" aria-live="polite"><span id="inventory-sheets-status">Registra entradas y salidas en la hoja operativa y luego sincroniza.</span> <a class="text-link" href="'+GOOGLE_INVENTORY_SHEETS_URL+'" target="_blank" rel="noopener noreferrer">Abrir control operativo ↗</a></div><div class="sheets-status"><span id="google-sheets-status">El reporte diario se mantiene separado y solo sirve para consulta.</span> <a class="text-link" href="'+GOOGLE_SHEETS_URL+'" target="_blank" rel="noopener noreferrer">Abrir reportes ↗</a></div>':'')+
  '<div id="overview-kpis" class="kpi-grid"></div><div class="overview-grid"><section class="panel"><h2>Actividad de los últimos 7 días</h2><p class="muted">Número de movimientos; no mezcla kilos, litros y unidades.</p><div id="activity"></div></section><section class="panel"><h2>Atención de inventario</h2><div id="alerts"></div><a href="inventario.html" class="text-link">Revisar lotes y mínimos →</a></section></div><section class="panel"><h2>Últimos movimientos</h2><div id="recent"></div></section>';
  const sheetsButton=root.querySelector('#update-google-sheets');
  if(sheetsButton) sheetsButton.onclick=async()=>{
@@ -18,7 +18,20 @@ export async function overviewPage(root,access={}){
    const result=await updateGoogleSheets();
    status.textContent='Pestaña '+result.title+' actualizada. Datos al '+new Date(result.updatedAt).toLocaleString('es-PE',{timeZone:'America/Lima'})+' (Perú).';
   }catch(error){status.textContent=error.message;status.classList.add('form-error');}
-  finally{sheetsButton.disabled=false;sheetsButton.textContent='Actualizar Google Sheets';}
+  finally{sheetsButton.disabled=false;sheetsButton.textContent='Actualizar reporte diario';}
+ };
+ const inventorySheetsButton=root.querySelector('#sync-inventory-sheets');
+ if(inventorySheetsButton)inventorySheetsButton.onclick=async()=>{
+  if(inventorySheetsButton.disabled)return;
+  inventorySheetsButton.disabled=true;const status=root.querySelector('#inventory-sheets-status');
+  try{
+   if(!await confirmAction({title:'Sincronizar inventario',message:'¿Quieres procesar las filas pendientes de Recepciones y Salidas? Los registros correctos actualizarán Supabase y no se duplicarán al reintentar.'}))return;
+   inventorySheetsButton.textContent='Sincronizando…';status.textContent='Validando la hoja y actualizando el inventario…';status.classList.remove('form-error');
+   const result=await syncInventorySheets();
+   status.textContent=result.processed===0?'La hoja quedó preparada. No había filas pendientes.':`${result.synchronized} fila(s) sincronizada(s) y ${result.errors} con error. Revisa la columna Resultado en la hoja.`;
+   await refresh();
+  }catch(error){status.textContent=error.message;status.classList.add('form-error');}
+  finally{inventorySheetsButton.disabled=false;inventorySheetsButton.textContent='Sincronizar inventario';}
  };
  async function refresh(){
   try{

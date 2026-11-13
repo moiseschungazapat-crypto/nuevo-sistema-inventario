@@ -16,7 +16,7 @@ test('recepción simple confirma lotes y stock en una operación, con reintentos
    create table public.productos(id bigserial primary key,nombre text,codigo text);
    create table public.inventario(id bigserial primary key,producto_id bigint,sede_id bigint,cantidad integer default 0,unique(producto_id,sede_id));
    create table public.movimientos(id bigserial primary key);`);
-  for(const file of ['202609150001_auth_access.sql','202609150002_inventory_modules.sql','202609150004_recepciones.sql','202609150006_catalogo_recepciones.sql','202610200014_recepcion_lotes_automaticos.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+  for(const file of ['202609150001_auth_access.sql','202609150002_inventory_modules.sql','202609150004_recepciones.sql','202609150006_catalogo_recepciones.sql','202610200014_recepcion_lotes_automaticos.sql','202611130018_google_sheets_operativo.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
   await db.exec(`insert into auth.users values('${user}','test@example.test');insert into public.auth_perfiles(user_id,nombre,activo,rol)values('${user}','Admin',true,'administrador');
    insert into public.productos(id,codigo,nombre,unidad_medida,controla_inventario,es_perecible)values(1,'P1','Carne','kg',true,true),(2,'P2','Latas','unidad',true,false),(3,'S1','Servicio','unidad',false,false);
    insert into public.proveedores(id,nombre)values(1,'Proveedor');insert into public.sedes(id,nombre)values(1,'Central');
@@ -58,6 +58,14 @@ test('recepción simple confirma lotes y stock en una operación, con reintentos
    const d=(await db.query('select * from public.recepcion_detalles where recepcion_id=$1',[id])).rows[0];
    assert.equal(Number(d.cantidad_facturada)-Number(d.cantidad_recibida),3);
    assert.equal(Number((await db.query('select cantidad from public.inventario where lote_id=$1',[d.lote_id])).rows[0].cantidad),7);
+  });
+  await t.test('la salida de Google Sheets consume lotes por FEFO y no se duplica al reintentar',async()=>{
+   await save(payload([line('2',{vencimiento:null,cantidad_recibida:5})]));
+   const operation=crypto.randomUUID(),args=[operation,'2','1',3,new Date().toISOString().slice(0,10),'GS-1','Consumo de producción'];
+   const first=(await db.query('select public.app_registrar_salida_fefo_google_sheets($1,$2,$3,$4,$5,$6,$7) as data',args)).rows[0].data;
+   const second=(await db.query('select public.app_registrar_salida_fefo_google_sheets($1,$2,$3,$4,$5,$6,$7) as data',args)).rows[0].data;
+   assert.equal(first.cantidad,3);assert.equal(second.repetido,true);
+   assert.equal(Number((await db.query('select sum(cantidad) total from public.inventario where producto_id=2')).rows[0].total),7);
   });
   await t.test('consulta y anónimo no pueden registrar recepciones',async()=>{
    await db.exec(`reset role;update public.auth_perfiles set rol='consulta';set role authenticated;`);
