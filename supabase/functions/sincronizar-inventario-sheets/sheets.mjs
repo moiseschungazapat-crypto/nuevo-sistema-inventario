@@ -46,6 +46,11 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
  const requests=[];
  const first=metadata.sheets?.[0]?.properties;
  if(first&&!names.has('Recepciones')){requests.push({updateSheetProperties:{properties:{sheetId:first.sheetId,title:'Recepciones',gridProperties:{rowCount:1500,columnCount:GRID_COLUMNS}},fields:'title,gridProperties'}});names.delete(first.title);names.add('Recepciones');}
+ for(const sheet of metadata.sheets||[]){
+  if(HEADERS[sheet.properties.title]&&Number(sheet.properties.gridProperties?.columnCount||0)<GRID_COLUMNS){
+   requests.push({updateSheetProperties:{properties:{sheetId:sheet.properties.sheetId,gridProperties:{columnCount:GRID_COLUMNS}},fields:'gridProperties.columnCount'}});
+  }
+ }
  for(const [title] of Object.entries(HEADERS))if(!names.has(title))requests.push({addSheet:{properties:{title,gridProperties:{rowCount:1500,columnCount:GRID_COLUMNS}}}});
  if(requests.length)await requestJson(await request(base+':batchUpdate',{method:'POST',headers:auth,body:JSON.stringify({requests}),signal:AbortSignal.timeout(30000)}),'No se pudo crear la estructura de la hoja.');
  metadata=await get();
@@ -75,11 +80,10 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
   format.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:13,endIndex:14},properties:{pixelSize:28},fields:'pixelSize'}});
  }
  for(const sheetId of [recep,salida]){
-  format.push({unmergeCells:{range:{sheetId,startRowIndex:0,endRowIndex:6,startColumnIndex:14,endColumnIndex:20}}});
-  for(let row=0;row<6;row++)format.push({mergeCells:{range:{sheetId,startRowIndex:row,endRowIndex:row+1,startColumnIndex:14,endColumnIndex:20},mergeType:'MERGE_ALL'}});
   format.push({repeatCell:{range:{sheetId,startRowIndex:0,endRowIndex:1,startColumnIndex:14,endColumnIndex:20},cell:{userEnteredFormat:{backgroundColor:{red:.92,green:.95,blue:.98},textFormat:{bold:true,foregroundColor:{red:.06,green:.14,blue:.22}},wrapStrategy:'WRAP'}},fields:'userEnteredFormat'}});
   format.push({repeatCell:{range:{sheetId,startRowIndex:1,endRowIndex:6,startColumnIndex:14,endColumnIndex:20},cell:{userEnteredFormat:{backgroundColor:{red:.97,green:.98,blue:1},textFormat:{foregroundColor:{red:.25,green:.32,blue:.42}},wrapStrategy:'WRAP',verticalAlignment:'TOP'}},fields:'userEnteredFormat'}});
-  format.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:14,endIndex:20},properties:{pixelSize:105},fields:'pixelSize'}});
+  format.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:14,endIndex:15},properties:{pixelSize:520},fields:'pixelSize'}});
+  format.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:15,endIndex:20},properties:{pixelSize:85},fields:'pixelSize'}});
  }
  format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:0,endColumnIndex:4},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
  format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:5,endColumnIndex:6},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});

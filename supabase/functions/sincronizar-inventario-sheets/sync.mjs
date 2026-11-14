@@ -76,7 +76,8 @@ export function createHandler({createClient,env,request=fetch}){
    await writeReferences(spreadsheetId,token,updated,request);
    return json({processed:receiptRows.length+outputRows.length,synchronized,errors,updatedAt:new Date().toISOString(),url:`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`});
   }catch(error){
-   const safe=message(error);return json({error:/^(No se pudo |Falta |La cuenta |Solo |Tu sesión|No existe)/.test(safe)?safe:'No se pudo sincronizar la hoja. Revisa la configuración y vuelve a intentar.'},502);
+   console.error('sincronizar-inventario-sheets',error);
+   const safe=message(error);return json({error:/^(No se pud|Falta |La cuenta |Solo |Tu sesión|No existe)/.test(safe)?safe:'No se pudo sincronizar la hoja. Revisa la configuración y vuelve a intentar.'},502);
   }
  };
 }
