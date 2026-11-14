@@ -7,6 +7,24 @@ export const HEADERS={
  'Proveedores':['Proveedor','Documento'],
  'Alertas':['Tipo','Código','Producto','Lote','Vencimiento','Cantidad','Unidad','Detalle'],
 };
+const GRID_COLUMNS=20;
+const GUIDES={
+ 'Recepciones':[
+  ['GUÍA RÁPIDA'],
+  ['1. Escribe un grupo para unir productos de la misma entrega.'],
+  ['2. Selecciona proveedor y código desde las listas.'],
+  ['3. Indica cantidad y vencimiento cuando corresponda.'],
+  ['4. Deja Estado vacío o escribe PENDIENTE.'],
+  ['5. Pulsa Sincronizar inventario desde el Dashboard.'],
+ ],
+ 'Salidas':[
+  ['GUÍA RÁPIDA'],
+  ['1. Registra fecha, código, cantidad y motivo.'],
+  ['2. El sistema elegirá automáticamente el lote por FEFO.'],
+  ['3. Deja Estado vacío o escribe PENDIENTE.'],
+  ['4. Revisa Resultado y Lotes usados después de sincronizar.'],
+ ],
+};
 const api=id=>'https://sheets.googleapis.com/v4/spreadsheets/'+encodeURIComponent(id);
 const headers=token=>({Authorization:'Bearer '+token,'Content-Type':'application/json'});
 const requestJson=async(response,message)=>{if(!response.ok)throw new Error(response.status===403||response.status===404?'No se pudo acceder a la hoja operativa. Confirma el permiso de Editor de la cuenta de servicio.':message);return response.status===204?{}:response.json();};
@@ -27,20 +45,54 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
  let metadata=await get(),names=new Set((metadata.sheets||[]).map(sheet=>sheet.properties.title));
  const requests=[];
  const first=metadata.sheets?.[0]?.properties;
- if(first&&!names.has('Recepciones')){requests.push({updateSheetProperties:{properties:{sheetId:first.sheetId,title:'Recepciones',gridProperties:{rowCount:1500,columnCount:HEADERS.Recepciones.length}},fields:'title,gridProperties'}});names.delete(first.title);names.add('Recepciones');}
- for(const [title,columns] of Object.entries(HEADERS))if(!names.has(title))requests.push({addSheet:{properties:{title,gridProperties:{rowCount:1500,columnCount:columns.length}}}});
+ if(first&&!names.has('Recepciones')){requests.push({updateSheetProperties:{properties:{sheetId:first.sheetId,title:'Recepciones',gridProperties:{rowCount:1500,columnCount:GRID_COLUMNS}},fields:'title,gridProperties'}});names.delete(first.title);names.add('Recepciones');}
+ for(const [title] of Object.entries(HEADERS))if(!names.has(title))requests.push({addSheet:{properties:{title,gridProperties:{rowCount:1500,columnCount:GRID_COLUMNS}}}});
  if(requests.length)await requestJson(await request(base+':batchUpdate',{method:'POST',headers:auth,body:JSON.stringify({requests}),signal:AbortSignal.timeout(30000)}),'No se pudo crear la estructura de la hoja.');
  metadata=await get();
  const sheetMap=Object.fromEntries(metadata.sheets.map(sheet=>[sheet.properties.title,sheet.properties.sheetId]));
  const values=Object.entries(HEADERS).map(([title,row])=>({range:`'${title}'!A1`,values:[row]}));
+ for(const [title,rows] of Object.entries(GUIDES))values.push({range:`'${title}'!O1`,values:rows});
  await writeValues(spreadsheetId,token,values,'RAW',request);
  const format=[];
  for(const [title,row] of Object.entries(HEADERS)){
   const sheetId=sheetMap[title];
+  format.push({updateSheetProperties:{properties:{sheetId,gridProperties:{columnCount:GRID_COLUMNS}},fields:'gridProperties.columnCount'}});
   format.push({repeatCell:{range:{sheetId,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:row.length},cell:{userEnteredFormat:{backgroundColor:{red:.06,green:.14,blue:.22},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},wrapStrategy:'WRAP',verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
   format.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:0,endIndex:1},properties:{pixelSize:38},fields:'pixelSize'}});
  }
  const recep=sheetMap.Recepciones,salida=sheetMap.Salidas;
+ const widths={
+  'Recepciones':[105,105,190,125,210,90,105,115,230,110,250,225,155],
+  'Salidas':[105,105,125,210,90,105,230,110,250,225,155,240],
+  'Inventario actual':[110,220,160,210,115,95,95,110,115],
+  'Catálogo':[115,240,180,100,100],
+  'Proveedores':[260,150],
+  'Alertas':[120,110,220,200,115,95,95,220],
+ };
+ for(const [title,sizes] of Object.entries(widths)){
+  const sheetId=sheetMap[title];
+  sizes.forEach((pixelSize,index)=>format.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:index,endIndex:index+1},properties:{pixelSize},fields:'pixelSize'}}));
+  format.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:13,endIndex:14},properties:{pixelSize:28},fields:'pixelSize'}});
+ }
+ for(const sheetId of [recep,salida]){
+  format.push({unmergeCells:{range:{sheetId,startRowIndex:0,endRowIndex:6,startColumnIndex:14,endColumnIndex:20}}});
+  for(let row=0;row<6;row++)format.push({mergeCells:{range:{sheetId,startRowIndex:row,endRowIndex:row+1,startColumnIndex:14,endColumnIndex:20},mergeType:'MERGE_ALL'}});
+  format.push({repeatCell:{range:{sheetId,startRowIndex:0,endRowIndex:1,startColumnIndex:14,endColumnIndex:20},cell:{userEnteredFormat:{backgroundColor:{red:.92,green:.95,blue:.98},textFormat:{bold:true,foregroundColor:{red:.06,green:.14,blue:.22}},wrapStrategy:'WRAP'}},fields:'userEnteredFormat'}});
+  format.push({repeatCell:{range:{sheetId,startRowIndex:1,endRowIndex:6,startColumnIndex:14,endColumnIndex:20},cell:{userEnteredFormat:{backgroundColor:{red:.97,green:.98,blue:1},textFormat:{foregroundColor:{red:.25,green:.32,blue:.42}},wrapStrategy:'WRAP',verticalAlignment:'TOP'}},fields:'userEnteredFormat'}});
+  format.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:14,endIndex:20},properties:{pixelSize:105},fields:'pixelSize'}});
+ }
+ format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:0,endColumnIndex:4},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
+ format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:5,endColumnIndex:6},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
+ format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:7,endColumnIndex:9},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
+ format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:4,endColumnIndex:5},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
+ format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:6,endColumnIndex:7},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
+ format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:9,endColumnIndex:13},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
+ format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:0,endColumnIndex:3},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
+ format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:4,endColumnIndex:5},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
+ format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:6,endColumnIndex:7},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
+ format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:3,endColumnIndex:4},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
+ format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:5,endColumnIndex:6},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
+ format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:7,endColumnIndex:12},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
  format.push({setDataValidation:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Proveedores'!$A$2:$A"}]},strict:true,showCustomUi:true}}});
  format.push({setDataValidation:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:3,endColumnIndex:4},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Catálogo'!$A$2:$A"}]},strict:true,showCustomUi:true}}});
  format.push({setDataValidation:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Catálogo'!$A$2:$A"}]},strict:true,showCustomUi:true}}});
