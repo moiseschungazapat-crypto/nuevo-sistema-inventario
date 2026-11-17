@@ -1,30 +1,18 @@
 export const DEFAULT_SPREADSHEET_ID='1wqU91ijwb4DXBUSG7jLeUbJmMMkgb9w4L_vtWt4wMp8';
+export const MOVEMENT_SHEET='Movimientos';
+export const MOVEMENT_START_ROW=21;
+export const MOVEMENT_HEADERS=['Fecha','Tipo','Categoría','Código producto','Producto','Cantidad','Unidad','Proveedor','Vencimiento','Observación / motivo','Estado','Resultado','ID interno','Sincronizado','Lotes usados'];
 export const HEADERS={
- 'Recepciones':['Grupo','Fecha','Proveedor','Código producto','Producto (automático)','Cantidad','Unidad (automática)','Vencimiento','Observaciones','Estado','Resultado','ID interno','Sincronizado'],
- 'Salidas':['Grupo','Fecha','Código producto','Producto (automático)','Cantidad','Unidad (automática)','Motivo','Estado','Resultado','ID interno','Sincronizado','Lotes usados'],
+ [MOVEMENT_SHEET]:MOVEMENT_HEADERS,
  'Inventario actual':['Código','Producto','Sede','Lote','Vencimiento','Cantidad','Unidad','Stock mínimo','Estado'],
  'Catálogo':['Código','Producto','Categoría','Unidad','Perecible'],
  'Proveedores':['Proveedor','Documento'],
  'Alertas':['Tipo','Código','Producto','Lote','Vencimiento','Cantidad','Unidad','Detalle'],
 };
+
 const GRID_COLUMNS=20;
-const GUIDES={
- 'Recepciones':[
-  ['GUÍA RÁPIDA'],
-  ['1. Escribe un grupo para unir productos de la misma entrega.'],
-  ['2. Selecciona proveedor y código desde las listas.'],
-  ['3. Indica cantidad y vencimiento cuando corresponda.'],
-  ['4. Deja Estado vacío o escribe PENDIENTE.'],
-  ['5. Pulsa Sincronizar inventario desde el Dashboard.'],
- ],
- 'Salidas':[
-  ['GUÍA RÁPIDA'],
-  ['1. Registra fecha, código, cantidad y motivo.'],
-  ['2. El sistema elegirá automáticamente el lote por FEFO.'],
-  ['3. Deja Estado vacío o escribe PENDIENTE.'],
-  ['4. Revisa Resultado y Lotes usados después de sincronizar.'],
- ],
-};
+const GRID_ROWS=1500;
+const LEGACY_SHEETS=new Set(['Recepciones','Salidas']);
 const api=id=>'https://sheets.googleapis.com/v4/spreadsheets/'+encodeURIComponent(id);
 const headers=token=>({Authorization:'Bearer '+token,'Content-Type':'application/json'});
 const requestJson=async(response,message)=>{if(!response.ok)throw new Error(response.status===403||response.status===404?'No se pudo acceder a la hoja operativa. Confirma el permiso de Editor de la cuenta de servicio.':message);return response.status===204?{}:response.json();};
@@ -37,38 +25,93 @@ export function dateValue(value){
  return `${match[3]}-${match[2].padStart(2,'0')}-${match[1].padStart(2,'0')}`;
 }
 export function numberValue(value){const parsed=Number(String(value??'').replace(',','.'));return Number.isFinite(parsed)?parsed:NaN;}
-export function pendingRows(values=[]){return values.map((cells,index)=>({row:index+2,cells})).filter(row=>row.cells.some(cell=>String(cell??'').trim())&&['','pendiente'].includes(normalize(row.cells[row.cells.length>12?9:7])));}
+export function pendingMovementRows(values=[]){return values.map((cells,index)=>({row:index+MOVEMENT_START_ROW,cells})).filter(row=>row.cells.some(cell=>String(cell??'').trim())&&['','pendiente'].includes(normalize(row.cells[10])));}
 
 export async function ensureWorkbook(spreadsheetId,token,request=fetch){
  const base=api(spreadsheetId),auth=headers(token);
  const get=async()=>requestJson(await request(base+'?fields=sheets.properties',{headers:auth,signal:AbortSignal.timeout(20000)}),'No se pudo consultar la hoja operativa.');
- let metadata=await get(),names=new Set((metadata.sheets||[]).map(sheet=>sheet.properties.title));
+ let metadata=await get();
+ const originalNames=new Set((metadata.sheets||[]).map(sheet=>sheet.properties.title));
+ const createdMovement=!originalNames.has(MOVEMENT_SHEET);
  const requests=[];
- const first=metadata.sheets?.[0]?.properties;
- if(first&&!names.has('Recepciones')){requests.push({updateSheetProperties:{properties:{sheetId:first.sheetId,title:'Recepciones',gridProperties:{rowCount:1500,columnCount:GRID_COLUMNS}},fields:'title,gridProperties'}});names.delete(first.title);names.add('Recepciones');}
+
+ if(createdMovement)requests.push({addSheet:{properties:{title:MOVEMENT_SHEET,index:0,gridProperties:{rowCount:GRID_ROWS,columnCount:GRID_COLUMNS}}}});
+ for(const [title] of Object.entries(HEADERS))if(!originalNames.has(title)&&title!==MOVEMENT_SHEET)requests.push({addSheet:{properties:{title,gridProperties:{rowCount:GRID_ROWS,columnCount:GRID_COLUMNS}}}});
  for(const sheet of metadata.sheets||[]){
-  if(HEADERS[sheet.properties.title]&&Number(sheet.properties.gridProperties?.columnCount||0)<GRID_COLUMNS){
-   requests.push({updateSheetProperties:{properties:{sheetId:sheet.properties.sheetId,gridProperties:{columnCount:GRID_COLUMNS}},fields:'gridProperties.columnCount'}});
+  const properties=sheet.properties,title=properties.title;
+  if(HEADERS[title]){
+   const grid=properties.gridProperties||{};
+   if(Number(grid.columnCount||0)<GRID_COLUMNS||Number(grid.rowCount||0)<GRID_ROWS)requests.push({updateSheetProperties:{properties:{sheetId:properties.sheetId,gridProperties:{columnCount:Math.max(GRID_COLUMNS,Number(grid.columnCount||0)),rowCount:Math.max(GRID_ROWS,Number(grid.rowCount||0))}},fields:'gridProperties.columnCount,gridProperties.rowCount'}});
+   if(properties.hidden)requests.push({updateSheetProperties:{properties:{sheetId:properties.sheetId,hidden:false},fields:'hidden'}});
+   if(title===MOVEMENT_SHEET&&properties.index!==0)requests.push({updateSheetProperties:{properties:{sheetId:properties.sheetId,index:0},fields:'index'}});
   }
+  if(LEGACY_SHEETS.has(title)&&!properties.hidden)requests.push({updateSheetProperties:{properties:{sheetId:properties.sheetId,hidden:true},fields:'hidden'}});
  }
- for(const [title] of Object.entries(HEADERS))if(!names.has(title))requests.push({addSheet:{properties:{title,gridProperties:{rowCount:1500,columnCount:GRID_COLUMNS}}}});
  if(requests.length)await requestJson(await request(base+':batchUpdate',{method:'POST',headers:auth,body:JSON.stringify({requests}),signal:AbortSignal.timeout(30000)}),'No se pudo crear la estructura de la hoja.');
+
  metadata=await get();
  const sheetMap=Object.fromEntries(metadata.sheets.map(sheet=>[sheet.properties.title,sheet.properties.sheetId]));
- const values=Object.entries(HEADERS).map(([title,row])=>({range:`'${title}'!A1`,values:[row]}));
- for(const [title,rows] of Object.entries(GUIDES))values.push({range:`'${title}'!O1`,values:rows});
- await writeValues(spreadsheetId,token,values,'RAW',request);
+ const movementId=sheetMap[MOVEMENT_SHEET];
+ const staticValues=[
+  {range:`'${MOVEMENT_SHEET}'!A1`,values:[['LA LIGURIA S.A. — CONTROL DE INVENTARIO']]},
+  {range:`'${MOVEMENT_SHEET}'!A2`,values:[['Registra una entrada o salida. El Dashboard procesa los movimientos pendientes y actualiza el stock.']]},
+  {range:`'${MOVEMENT_SHEET}'!A4`,values:[['REGISTRAR MOVIMIENTO']]},
+  {range:`'${MOVEMENT_SHEET}'!A6:A13`,values:[['Tipo de movimiento'],['Fecha'],['Categoría'],['Código del producto'],['Cantidad'],['Proveedor (solo entrada)'],['Vencimiento (si corresponde)'],['Observación / motivo']]},
+  {range:`'${MOVEMENT_SHEET}'!F6:F10`,values:[['STOCK DEL PRODUCTO'],['Producto'],['Stock antes'],['Stock después'],['Unidad']]},
+  {range:`'${MOVEMENT_SHEET}'!B15`,values:[['REGISTRAR MOVIMIENTO']]},
+  {range:`'${MOVEMENT_SHEET}'!F15`,values:[['LIMPIAR FORMULARIO']]},
+  {range:`'${MOVEMENT_SHEET}'!A19`,values:[['HISTORIAL DE MOVIMIENTOS']]},
+  {range:`'${MOVEMENT_SHEET}'!A20`,values:[MOVEMENT_HEADERS]},
+ ];
+ for(const [title,row] of Object.entries(HEADERS))if(title!==MOVEMENT_SHEET)staticValues.push({range:`'${title}'!A1`,values:[row]});
+ await writeValues(spreadsheetId,token,staticValues,'RAW',request);
+ await writeValues(spreadsheetId,token,[
+  {range:`'${MOVEMENT_SHEET}'!H7:H10`,values:[["=IFERROR(VLOOKUP(C9,'Catálogo'!A:E,2,FALSE),\"\")"],["=IF(C9=\"\",\"\",SUMIF('Inventario actual'!A:A,C9,'Inventario actual'!F:F))"],["=IF(OR(C6=\"\",C9=\"\",C10=\"\"),\"\",IF(C6=\"Entrada\",H8+C10,H8-C10))"],["=IFERROR(VLOOKUP(C9,'Catálogo'!A:E,4,FALSE),\"\")"]]},
+ ],'USER_ENTERED',request);
+ if(createdMovement)await writeValues(spreadsheetId,token,[{range:`'${MOVEMENT_SHEET}'!C6:C7`,values:[['Salida'],['=TODAY()']]},{range:`'${MOVEMENT_SHEET}'!A15`,values:[[false]]},{range:`'${MOVEMENT_SHEET}'!E15`,values:[[false]]},{range:`'${MOVEMENT_SHEET}'!A17`,values:[['Completa el formulario y marca Registrar movimiento.']]}],'USER_ENTERED',request);
+
  const format=[];
  for(const [title,row] of Object.entries(HEADERS)){
   const sheetId=sheetMap[title];
-  format.push({updateSheetProperties:{properties:{sheetId,gridProperties:{columnCount:GRID_COLUMNS}},fields:'gridProperties.columnCount'}});
-  format.push({repeatCell:{range:{sheetId,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:row.length},cell:{userEnteredFormat:{backgroundColor:{red:.06,green:.14,blue:.22},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},wrapStrategy:'WRAP',verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
-  format.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:0,endIndex:1},properties:{pixelSize:38},fields:'pixelSize'}});
+  format.push({updateSheetProperties:{properties:{sheetId,gridProperties:{columnCount:GRID_COLUMNS,rowCount:GRID_ROWS,hideGridlines:title===MOVEMENT_SHEET}},fields:'gridProperties.columnCount,gridProperties.rowCount,gridProperties.hideGridlines'}});
+  if(title!==MOVEMENT_SHEET){
+   format.push({repeatCell:{range:{sheetId,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:row.length},cell:{userEnteredFormat:{backgroundColor:{red:.06,green:.14,blue:.22},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},wrapStrategy:'WRAP',horizontalAlignment:'CENTER',verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+   format.push({updateDimensionProperties:{range:{sheetId,dimension:'ROWS',startIndex:0,endIndex:1},properties:{pixelSize:38},fields:'pixelSize'}});
+  }
  }
- const recep=sheetMap.Recepciones,salida=sheetMap.Salidas;
+
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:0,endRowIndex:1,startColumnIndex:0,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.06,green:.14,blue:.22},textFormat:{bold:true,fontSize:16,foregroundColor:{red:1,green:1,blue:1}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:1,endRowIndex:2,startColumnIndex:0,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.96,blue:.98},textFormat:{italic:true,foregroundColor:{red:.25,green:.32,blue:.42}}}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:3,endRowIndex:4,startColumnIndex:0,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.06,green:.14,blue:.22},textFormat:{bold:true,fontSize:13,foregroundColor:{red:1,green:1,blue:1}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:5,endRowIndex:13,startColumnIndex:0,endColumnIndex:1},cell:{userEnteredFormat:{backgroundColor:{red:.91,green:.94,blue:.97},textFormat:{bold:true,foregroundColor:{red:.06,green:.14,blue:.22}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:5,endRowIndex:13,startColumnIndex:2,endColumnIndex:4},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.98,blue:.88},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:5,endRowIndex:10,startColumnIndex:5,endColumnIndex:7},cell:{userEnteredFormat:{backgroundColor:{red:.91,green:.94,blue:.97},textFormat:{bold:true,foregroundColor:{red:.06,green:.14,blue:.22}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:6,endRowIndex:10,startColumnIndex:7,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.93,green:.98,blue:.94},textFormat:{bold:true,foregroundColor:{red:.04,green:.35,blue:.16}},horizontalAlignment:'RIGHT',verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:0,endColumnIndex:4},cell:{userEnteredFormat:{backgroundColor:{red:.06,green:.14,blue:.22},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:4,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.91,green:.45,blue:.18},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:16,endRowIndex:17,startColumnIndex:0,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.9,green:.97,blue:.91},textFormat:{bold:true,foregroundColor:{red:.03,green:.38,blue:.15}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:18,endRowIndex:19,startColumnIndex:0,endColumnIndex:15},cell:{userEnteredFormat:{backgroundColor:{red:.06,green:.14,blue:.22},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:19,endRowIndex:20,startColumnIndex:0,endColumnIndex:15},cell:{userEnteredFormat:{backgroundColor:{red:.22,green:.4,blue:.57},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},wrapStrategy:'WRAP',horizontalAlignment:'CENTER',verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'ROWS',startIndex:0,endIndex:1},properties:{pixelSize:44},fields:'pixelSize'}});
+ format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'ROWS',startIndex:3,endIndex:4},properties:{pixelSize:34},fields:'pixelSize'}});
+ format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'ROWS',startIndex:14,endIndex:15},properties:{pixelSize:38},fields:'pixelSize'}});
+ format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'ROWS',startIndex:19,endIndex:20},properties:{pixelSize:42},fields:'pixelSize'}});
+ const movementWidths=[110,190,175,125,220,95,95,185,125,230,115,260,220,160,240];
+ movementWidths.forEach((pixelSize,index)=>format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'COLUMNS',startIndex:index,endIndex:index+1},properties:{pixelSize},fields:'pixelSize'}}));
+ format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'COLUMNS',startIndex:12,endIndex:14},properties:{hiddenByUser:true},fields:'hiddenByUser'}});
+ format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:5,endRowIndex:6,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_LIST',values:[{userEnteredValue:'Entrada'},{userEnteredValue:'Salida'}]},strict:true,showCustomUi:true}}});
+ format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:7,endRowIndex:8,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Catálogo'!$C$2:$C$1500"}]},strict:false,showCustomUi:true}}});
+ format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:8,endRowIndex:9,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Catálogo'!$A$2:$A$1500"}]},strict:true,showCustomUi:true}}});
+ format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:10,endRowIndex:11,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Proveedores'!$A$2:$A$1500"}]},strict:false,showCustomUi:true}}});
+ format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:0,endColumnIndex:1},rule:{condition:{type:'BOOLEAN'},strict:true,showCustomUi:true}}});
+ format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:4,endColumnIndex:5},rule:{condition:{type:'BOOLEAN'},strict:true,showCustomUi:true}}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:6,endRowIndex:7,startColumnIndex:2,endColumnIndex:3},cell:{userEnteredFormat:{numberFormat:{type:'DATE',pattern:'dd/mm/yyyy'}}},fields:'userEnteredFormat.numberFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:11,endRowIndex:12,startColumnIndex:2,endColumnIndex:3},cell:{userEnteredFormat:{numberFormat:{type:'DATE',pattern:'dd/mm/yyyy'}}},fields:'userEnteredFormat.numberFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:MOVEMENT_START_ROW-1,endRowIndex:GRID_ROWS,startColumnIndex:0,endColumnIndex:1},cell:{userEnteredFormat:{numberFormat:{type:'DATE',pattern:'dd/mm/yyyy'}}},fields:'userEnteredFormat.numberFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:MOVEMENT_START_ROW-1,endRowIndex:GRID_ROWS,startColumnIndex:8,endColumnIndex:9},cell:{userEnteredFormat:{numberFormat:{type:'DATE',pattern:'dd/mm/yyyy'}}},fields:'userEnteredFormat.numberFormat'}});
+ if(createdMovement)format.push({setBasicFilter:{filter:{range:{sheetId:movementId,startRowIndex:19,endRowIndex:GRID_ROWS,startColumnIndex:0,endColumnIndex:15}}}});
+
  const widths={
-  'Recepciones':[105,105,190,125,210,90,105,115,230,110,250,225,155],
-  'Salidas':[105,105,125,210,90,105,230,110,250,225,155,240],
   'Inventario actual':[110,220,160,210,115,95,95,110,115],
   'Catálogo':[115,240,180,100,100],
   'Proveedores':[260,150],
@@ -77,32 +120,11 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
  for(const [title,sizes] of Object.entries(widths)){
   const sheetId=sheetMap[title];
   sizes.forEach((pixelSize,index)=>format.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:index,endIndex:index+1},properties:{pixelSize},fields:'pixelSize'}}));
-  format.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:13,endIndex:14},properties:{pixelSize:28},fields:'pixelSize'}});
  }
- for(const sheetId of [recep,salida]){
-  format.push({repeatCell:{range:{sheetId,startRowIndex:0,endRowIndex:1,startColumnIndex:14,endColumnIndex:20},cell:{userEnteredFormat:{backgroundColor:{red:.92,green:.95,blue:.98},textFormat:{bold:true,foregroundColor:{red:.06,green:.14,blue:.22}},wrapStrategy:'WRAP'}},fields:'userEnteredFormat'}});
-  format.push({repeatCell:{range:{sheetId,startRowIndex:1,endRowIndex:6,startColumnIndex:14,endColumnIndex:20},cell:{userEnteredFormat:{backgroundColor:{red:.97,green:.98,blue:1},textFormat:{foregroundColor:{red:.25,green:.32,blue:.42}},wrapStrategy:'WRAP',verticalAlignment:'TOP'}},fields:'userEnteredFormat'}});
-  format.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:14,endIndex:15},properties:{pixelSize:520},fields:'pixelSize'}});
-  format.push({updateDimensionProperties:{range:{sheetId,dimension:'COLUMNS',startIndex:15,endIndex:20},properties:{pixelSize:85},fields:'pixelSize'}});
- }
- format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:0,endColumnIndex:4},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:5,endColumnIndex:6},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:7,endColumnIndex:9},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:4,endColumnIndex:5},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:6,endColumnIndex:7},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({repeatCell:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:9,endColumnIndex:13},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:0,endColumnIndex:3},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:4,endColumnIndex:5},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:6,endColumnIndex:7},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.99,blue:.94}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:3,endColumnIndex:4},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:5,endColumnIndex:6},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({repeatCell:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:7,endColumnIndex:12},cell:{userEnteredFormat:{backgroundColor:{red:.94,green:.97,blue:1}}},fields:'userEnteredFormat.backgroundColor'}});
- format.push({setDataValidation:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Proveedores'!$A$2:$A"}]},strict:true,showCustomUi:true}}});
- format.push({setDataValidation:{range:{sheetId:recep,startRowIndex:1,endRowIndex:1500,startColumnIndex:3,endColumnIndex:4},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Catálogo'!$A$2:$A"}]},strict:true,showCustomUi:true}}});
- format.push({setDataValidation:{range:{sheetId:salida,startRowIndex:1,endRowIndex:1500,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Catálogo'!$A$2:$A"}]},strict:true,showCustomUi:true}}});
  await requestJson(await request(base+':batchUpdate',{method:'POST',headers:auth,body:JSON.stringify({requests:format}),signal:AbortSignal.timeout(30000)}),'No se pudo aplicar el formato de la hoja.');
  return sheetMap;
 }
+
 export async function readValues(spreadsheetId,token,ranges,request=fetch){
  const query=ranges.map(range=>'ranges='+encodeURIComponent(range)).join('&');
  const data=await requestJson(await request(api(spreadsheetId)+'/values:batchGet?majorDimension=ROWS&'+query,{headers:headers(token),signal:AbortSignal.timeout(30000)}),'No se pudieron leer los registros de la hoja.');
