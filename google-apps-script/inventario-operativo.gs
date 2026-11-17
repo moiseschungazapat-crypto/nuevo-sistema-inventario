@@ -18,6 +18,7 @@ const INVENTARIO_CONFIG = Object.freeze({
     estado: 'A17',
     producto: 'H7',
     stock: 'H8',
+    stockDespues: 'H9',
     unidad: 'H10',
   },
 });
@@ -33,6 +34,7 @@ function onOpen() {
     .addToUi();
   const hoja = SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.hoja);
   if (hoja && !hoja.getRange(INVENTARIO_CONFIG.celdas.fecha).getValue()) hoja.getRange(INVENTARIO_CONFIG.celdas.fecha).setValue(new Date()).setNumberFormat('dd/mm/yyyy');
+  actualizarVistaPrevia_();
 }
 
 function onEdit(e) {
@@ -42,7 +44,8 @@ function onEdit(e) {
   if (celda === INVENTARIO_CONFIG.celdas.limpiar && e.value === 'TRUE') return limpiarFormulario();
   if (celda === INVENTARIO_CONFIG.celdas.categoria) return actualizarProductosPorCategoria();
   if (celda === INVENTARIO_CONFIG.celdas.codigo) return completarCategoriaSeleccionada();
-  if (celda === INVENTARIO_CONFIG.celdas.tipo) return actualizarAyudaTipo();
+  if (celda === INVENTARIO_CONFIG.celdas.tipo) { actualizarAyudaTipo(); return actualizarVistaPrevia_(); }
+  if (celda === INVENTARIO_CONFIG.celdas.cantidad) return actualizarVistaPrevia_();
 }
 
 function registrarMovimiento() {
@@ -125,6 +128,7 @@ function limpiarFormulario_(conservarEstado) {
   hoja.getRange(INVENTARIO_CONFIG.celdas.fecha).setValue(new Date()).setNumberFormat('dd/mm/yyyy');
   hoja.getRange(INVENTARIO_CONFIG.celdas.registrar).setValue(false);
   hoja.getRange(INVENTARIO_CONFIG.celdas.limpiar).setValue(false);
+  actualizarVistaPrevia_();
   if (!conservarEstado) hoja.getRange(INVENTARIO_CONFIG.celdas.estado).setValue('Completa el formulario y marca Registrar movimiento.');
 }
 
@@ -137,6 +141,7 @@ function actualizarProductosPorCategoria() {
   const celda = hoja.getRange(INVENTARIO_CONFIG.celdas.codigo).clearContent();
   if (codigos.length) celda.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(codigos, true).setAllowInvalid(false).build());
   else celda.clearDataValidations();
+  actualizarVistaPrevia_();
   mostrarEstado_(codigos.length ? `${codigos.length} producto(s) disponibles en ${categoria}.` : 'No hay productos activos en esa categoría.', codigos.length === 0);
 }
 
@@ -144,6 +149,43 @@ function completarCategoriaSeleccionada() {
   const hoja = SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.hoja);
   const producto = buscarProducto_(texto_(hoja.getRange(INVENTARIO_CONFIG.celdas.codigo).getValue()));
   if (producto) hoja.getRange(INVENTARIO_CONFIG.celdas.categoria).setValue(producto.categoria);
+  actualizarVistaPrevia_();
+}
+
+function actualizarVistaPrevia_() {
+  const libro = SpreadsheetApp.getActive();
+  const hoja = libro.getSheetByName(INVENTARIO_CONFIG.hoja);
+  if (!hoja) return;
+  const codigo = texto_(hoja.getRange(INVENTARIO_CONFIG.celdas.codigo).getValue());
+  const producto = buscarProducto_(codigo);
+  if (!producto) {
+    hoja.getRangeList([
+      INVENTARIO_CONFIG.celdas.producto,
+      INVENTARIO_CONFIG.celdas.stock,
+      INVENTARIO_CONFIG.celdas.stockDespues,
+      INVENTARIO_CONFIG.celdas.unidad,
+    ]).clearContent();
+    return;
+  }
+  const stock = stockActual_(producto.codigo);
+  const cantidad = numero_(hoja.getRange(INVENTARIO_CONFIG.celdas.cantidad).getValue());
+  const tipo = texto_(hoja.getRange(INVENTARIO_CONFIG.celdas.tipo).getValue());
+  const despues = Number.isFinite(cantidad) && cantidad > 0
+    ? (tipo === 'Entrada' ? stock + cantidad : stock - cantidad)
+    : '';
+  hoja.getRange(INVENTARIO_CONFIG.celdas.producto).setValue(producto.nombre);
+  hoja.getRange(INVENTARIO_CONFIG.celdas.stock).setValue(stock);
+  hoja.getRange(INVENTARIO_CONFIG.celdas.stockDespues).setValue(despues);
+  hoja.getRange(INVENTARIO_CONFIG.celdas.unidad).setValue(producto.unidad);
+}
+
+function stockActual_(codigo) {
+  const hoja = SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.inventario);
+  if (!hoja || hoja.getLastRow() < 2) return 0;
+  const buscado = normalizar_(codigo);
+  return hoja.getRange(2, 1, hoja.getLastRow() - 1, 6).getValues()
+    .filter(fila => normalizar_(fila[0]) === buscado)
+    .reduce((total, fila) => total + (numero_(fila[5]) || 0), 0);
 }
 
 function actualizarAyudaTipo() {

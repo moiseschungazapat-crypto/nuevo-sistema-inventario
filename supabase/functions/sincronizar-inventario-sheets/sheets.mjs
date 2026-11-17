@@ -58,16 +58,18 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
   {range:`'${MOVEMENT_SHEET}'!A4`,values:[['REGISTRAR MOVIMIENTO']]},
   {range:`'${MOVEMENT_SHEET}'!A6:A13`,values:[['Tipo de movimiento'],['Fecha'],['Categoría'],['Código del producto'],['Cantidad'],['Proveedor (solo entrada)'],['Vencimiento (si corresponde)'],['Observación / motivo']]},
   {range:`'${MOVEMENT_SHEET}'!F6:F10`,values:[['STOCK DEL PRODUCTO'],['Producto'],['Stock antes'],['Stock después'],['Unidad']]},
-  {range:`'${MOVEMENT_SHEET}'!B15`,values:[['REGISTRAR MOVIMIENTO']]},
-  {range:`'${MOVEMENT_SHEET}'!F15`,values:[['LIMPIAR FORMULARIO']]},
+  {range:`'${MOVEMENT_SHEET}'!B15`,values:[['MARCA EL CUADRO PARA REGISTRAR']]},
+  {range:`'${MOVEMENT_SHEET}'!F15`,values:[['MARCA EL CUADRO PARA LIMPIAR']]},
   {range:`'${MOVEMENT_SHEET}'!A19`,values:[['HISTORIAL DE MOVIMIENTOS']]},
   {range:`'${MOVEMENT_SHEET}'!A20`,values:[MOVEMENT_HEADERS]},
  ];
  for(const [title,row] of Object.entries(HEADERS))if(title!==MOVEMENT_SHEET)staticValues.push({range:`'${title}'!A1`,values:[row]});
  await writeValues(spreadsheetId,token,staticValues,'RAW',request);
+ // La vista previa se completa con Apps Script. Evita fórmulas dependientes
+ // de la configuración regional (coma/punto y coma) de cada hoja.
  await writeValues(spreadsheetId,token,[
-  {range:`'${MOVEMENT_SHEET}'!H7:H10`,values:[["=IFERROR(VLOOKUP(C9,'Catálogo'!A:E,2,FALSE),\"\")"],["=IF(C9=\"\",\"\",SUMIF('Inventario actual'!A:A,C9,'Inventario actual'!F:F))"],["=IF(OR(C6=\"\",C9=\"\",C10=\"\"),\"\",IF(C6=\"Entrada\",H8+C10,H8-C10))"],["=IFERROR(VLOOKUP(C9,'Catálogo'!A:E,4,FALSE),\"\")"]]},
- ],'USER_ENTERED',request);
+  {range:`'${MOVEMENT_SHEET}'!H7:H10`,values:[[''],[''],[''],['']]},
+ ],'RAW',request);
  if(createdMovement)await writeValues(spreadsheetId,token,[{range:`'${MOVEMENT_SHEET}'!C6:C7`,values:[['Salida'],['=TODAY()']]},{range:`'${MOVEMENT_SHEET}'!A15`,values:[[false]]},{range:`'${MOVEMENT_SHEET}'!E15`,values:[[false]]},{range:`'${MOVEMENT_SHEET}'!A17`,values:[['Completa el formulario y marca Registrar movimiento.']]}],'USER_ENTERED',request);
 
  const format=[];

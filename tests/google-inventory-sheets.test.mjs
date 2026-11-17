@@ -50,5 +50,7 @@ test('prepara el panel y conserva ocultas las pestañas antiguas',async()=>{
  assert.equal(firstBatch.filter(item=>item.updateSheetProperties?.properties?.hidden===true).length,2);
  const valueBodies=calls.filter(call=>call.url.includes('/values:batchUpdate')).map(call=>JSON.parse(call.options.body));
  assert.ok(valueBodies.some(body=>body.data?.some(item=>item.range==="'Movimientos'!A20")));
- assert.ok(valueBodies.some(body=>body.data?.some(item=>item.range==="'Movimientos'!H7:H10")));
+ const preview=valueBodies.flatMap(body=>body.data||[]).find(item=>item.range==="'Movimientos'!H7:H10");
+ assert.deepEqual(preview?.values,[[''],[''],[''],['']]);
+ assert.ok(valueBodies.some(body=>body.data?.some(item=>item.range==="'Movimientos'!B15"&&item.values?.[0]?.[0]?.includes('MARCA EL CUADRO'))));
 });
