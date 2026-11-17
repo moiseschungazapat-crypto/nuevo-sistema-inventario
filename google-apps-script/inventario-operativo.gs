@@ -29,9 +29,10 @@ const BOTON_LIMPIAR_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAaQAAABACAYAAABV7gMVAAAAAXNSR
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Inventario')
+    .addItem('Abrir panel interactivo', 'abrirPanelInventario')
+    .addSeparator()
     .addItem('Registrar movimiento', 'registrarMovimiento')
     .addItem('Limpiar formulario', 'limpiarFormulario')
-    .addItem('Instalar botones visuales', 'instalarBotonesVisuales')
     .addSeparator()
     .addItem('Ver inventario actual', 'verInventarioActual')
     .addItem('Ir al historial', 'irAlHistorial')
@@ -39,6 +40,107 @@ function onOpen() {
   const hoja = SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.hoja);
   if (hoja && !hoja.getRange(INVENTARIO_CONFIG.celdas.fecha).getValue()) hoja.getRange(INVENTARIO_CONFIG.celdas.fecha).setValue(new Date()).setNumberFormat('dd/mm/yyyy');
   actualizarVistaPrevia_();
+}
+
+function abrirPanelInventario() {
+  retirarBotonesVisuales_();
+  const html = HtmlService.createHtmlOutput(`
+    <style>
+      :root{font-family:Arial,sans-serif;color:#172435;color-scheme:light;background:#fff}
+      *{box-sizing:border-box}
+      body{margin:0;padding:18px;background:#fff}
+      .top{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+      .mark{display:grid;place-items:center;width:40px;height:40px;border-radius:50%;background:#103649;color:#fff;font-size:19px}
+      h1{margin:0;font-size:16px;color:#172435}p{margin:3px 0 0;color:#66758a;font-size:12px}
+      .summary{display:grid;gap:9px;padding:13px;margin-bottom:16px;border-radius:11px;background:#eef3f7;font-size:12px}
+      .row{display:flex;justify-content:space-between;gap:12px}.row span{color:#66758a}.row strong{text-align:right}
+      button{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;padding:13px 14px;border:0;border-radius:10px;color:#fff;font:600 13px Arial,sans-serif;cursor:pointer;transition:transform .18s ease,background-color .18s ease,box-shadow .18s ease}
+      button:hover,button:focus-visible{transform:translateY(-2px) scale(1.01);box-shadow:0 10px 22px rgba(15,52,70,.28)}
+      button:active{transform:translateY(1px) scale(.98)}button:disabled{cursor:wait;opacity:.72;transform:none}
+      .register{background:#103649;box-shadow:0 6px 14px rgba(15,52,70,.2)}.register:hover{background:#164b63}
+      .clear{margin-top:10px;background:#ed762d;box-shadow:0 6px 14px rgba(237,118,45,.2)}.clear:hover{background:#f58b49}
+      .hint{display:flex;align-items:center;justify-content:center;gap:5px;margin:10px 0 14px;color:#66758a;font-size:11px}
+      .status{min-height:46px;display:grid;place-items:center;margin-top:14px;padding:10px;border-radius:9px;background:#e7f7ec;color:#176b32;text-align:center;font-size:12px}
+      .status.error{background:#fdecec;color:#b42318}.spinner{width:15px;height:15px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+      @keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){button{transition:none}.spinner{animation:none}}
+    </style>
+    <div class="top"><div class="mark">▦</div><div><h1>Movimiento de inventario</h1><p>Revisa los datos antes de confirmar</p></div></div>
+    <div class="summary">
+      <div class="row"><span>Tipo</span><strong id="tipo">—</strong></div>
+      <div class="row"><span>Producto</span><strong id="producto">—</strong></div>
+      <div class="row"><span>Cantidad</span><strong id="cantidad">—</strong></div>
+      <div class="row"><span>Stock actual</span><strong id="stock">—</strong></div>
+      <div class="row"><span>Stock después</span><strong id="despues">—</strong></div>
+    </div>
+    <button class="register" id="registrar" type="button"><span>✓</span><span>Registrar movimiento</span></button>
+    <div class="hint"><span>↖</span><span>Pasa el mouse para ver la animación</span></div>
+    <button class="clear" id="limpiar" type="button"><span>↻</span><span>Limpiar formulario</span></button>
+    <div class="status" id="estado" aria-live="polite">Cargando los datos de la hoja…</div>
+    <script>
+      const registrar=document.getElementById('registrar');
+      const limpiar=document.getElementById('limpiar');
+      const estado=document.getElementById('estado');
+      function texto(id,valor){document.getElementById(id).textContent=valor||'—'}
+      function mostrar(datos){
+        texto('tipo',datos.tipo);texto('producto',datos.producto);texto('cantidad',datos.cantidad);
+        texto('stock',datos.stock);texto('despues',datos.despues);
+        estado.textContent=datos.estado||'Listo para registrar.';
+        estado.classList.toggle('error',Boolean(datos.error));
+      }
+      function refrescar(){google.script.run.withSuccessHandler(mostrar).obtenerResumenFormulario()}
+      function ocupado(boton,texto){boton.disabled=true;boton.innerHTML='<span class="spinner"></span><span>'+texto+'</span>'}
+      function restaurar(boton,icono,texto){boton.disabled=false;boton.innerHTML='<span>'+icono+'</span><span>'+texto+'</span>'}
+      registrar.addEventListener('click',function(){
+        ocupado(registrar,'Procesando…');estado.textContent='Validando stock y datos del movimiento…';estado.classList.remove('error');
+        google.script.run.withSuccessHandler(function(datos){restaurar(registrar,'✓','Registrar movimiento');mostrar(datos)}).withFailureHandler(function(error){restaurar(registrar,'✓','Registrar movimiento');estado.textContent=error.message||'No se pudo registrar.';estado.classList.add('error')}).registrarDesdePanel();
+      });
+      limpiar.addEventListener('click',function(){
+        ocupado(limpiar,'Limpiando…');
+        google.script.run.withSuccessHandler(function(datos){restaurar(limpiar,'↻','Limpiar formulario');mostrar(datos)}).withFailureHandler(function(error){restaurar(limpiar,'↻','Limpiar formulario');estado.textContent=error.message||'No se pudo limpiar.';estado.classList.add('error')}).limpiarDesdePanel();
+      });
+      refrescar();setInterval(refrescar,5000);
+    <\/script>
+  `).setTitle('Inventario La Liguria');
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
+function retirarBotonesVisuales_() {
+  const hoja = SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.hoja);
+  if (!hoja) return;
+  hoja.getImages()
+    .filter(imagen => String(imagen.getAltTextTitle() || '').indexOf('Inventario:') === 0)
+    .forEach(imagen => imagen.remove());
+  hoja.getRange('A15:H15').clearContent().clearDataValidations().setBackground('#F5F7FA');
+  hoja.setRowHeight(15, 28);
+}
+
+function obtenerResumenFormulario() {
+  const hoja = SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.hoja);
+  const valor = celda => hoja.getRange(celda).getDisplayValue();
+  const unidad = valor(INVENTARIO_CONFIG.celdas.unidad);
+  const cantidad = valor(INVENTARIO_CONFIG.celdas.cantidad);
+  const stock = valor(INVENTARIO_CONFIG.celdas.stock);
+  const despues = valor(INVENTARIO_CONFIG.celdas.stockDespues);
+  const estado = valor(INVENTARIO_CONFIG.celdas.estado);
+  return {
+    tipo: valor(INVENTARIO_CONFIG.celdas.tipo),
+    producto: valor(INVENTARIO_CONFIG.celdas.producto) || valor(INVENTARIO_CONFIG.celdas.codigo),
+    cantidad: cantidad ? cantidad + (unidad ? ' ' + unidad : '') : '',
+    stock: stock ? stock + (unidad ? ' ' + unidad : '') : '',
+    despues: despues ? despues + (unidad ? ' ' + unidad : '') : '',
+    estado,
+    error: /falta|selecciona|indica|insuficiente|no se pudo|error/i.test(estado),
+  };
+}
+
+function registrarDesdePanel() {
+  registrarMovimiento();
+  return obtenerResumenFormulario();
+}
+
+function limpiarDesdePanel() {
+  limpiarFormulario();
+  return obtenerResumenFormulario();
 }
 
 function instalarBotonesVisuales() {
@@ -72,25 +174,6 @@ function onEdit(e) {
   if (celda === INVENTARIO_CONFIG.celdas.codigo) return completarCategoriaSeleccionada();
   if (celda === INVENTARIO_CONFIG.celdas.tipo) { actualizarAyudaTipo(); return actualizarVistaPrevia_(); }
   if (celda === INVENTARIO_CONFIG.celdas.cantidad) return actualizarVistaPrevia_();
-}
-
-// Convierte las franjas grandes de la fila 15 en botones seleccionables.
-// B15:D15 registra y F15:H15 limpia; los cuadrados A15 y E15 se conservan
-// para quienes prefieran usar casillas de verificación.
-function onSelectionChange(e) {
-  if (!e || !e.range || e.range.getSheet().getName() !== INVENTARIO_CONFIG.hoja) return;
-  const fila = e.range.getRow();
-  const columna = e.range.getColumn();
-  if (fila !== 15) return;
-  const hoja = e.range.getSheet();
-  if (columna >= 2 && columna <= 4) {
-    hoja.setActiveSelection(INVENTARIO_CONFIG.celdas.tipo);
-    return registrarMovimiento();
-  }
-  if (columna >= 6 && columna <= 8) {
-    hoja.setActiveSelection(INVENTARIO_CONFIG.celdas.tipo);
-    return limpiarFormulario();
-  }
 }
 
 function registrarMovimiento() {
