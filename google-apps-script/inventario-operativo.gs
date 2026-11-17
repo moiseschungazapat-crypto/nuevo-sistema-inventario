@@ -97,6 +97,8 @@ function registrarMovimiento() {
   const libro = SpreadsheetApp.getActive();
   const hoja = libro.getSheetByName(INVENTARIO_CONFIG.hoja);
   if (!hoja) throw new Error('No existe la hoja Movimientos. Ejecuta primero la sincronización desde el Dashboard.');
+  animarBoton_('registrar');
+  libro.toast('Validando el movimiento…', 'Inventario', 3);
   const lock = LockService.getDocumentLock();
   if (!lock.tryLock(10000)) return mostrarEstado_('Hay otro registro en proceso. Intenta nuevamente.', true);
   try {
@@ -153,9 +155,33 @@ function registrarMovimiento() {
 }
 
 function limpiarFormulario() {
+  animarBoton_('limpiar');
   limpiarFormulario_(false);
   mostrarEstado_('Formulario limpio.', false);
   SpreadsheetApp.getActive().toast('Formulario limpio.', 'Inventario', 3);
+}
+
+function animarBoton_(accion) {
+  const hoja = SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.hoja);
+  if (!hoja) return;
+  const titulo = accion === 'registrar'
+    ? 'Inventario: registrar movimiento'
+    : 'Inventario: limpiar formulario';
+  const imagen = hoja.getImages().find(item => item.getAltTextTitle() === titulo);
+  if (!imagen) return;
+  imagen
+    .setWidth(408)
+    .setHeight(59)
+    .setAnchorCellXOffset(10)
+    .setAnchorCellYOffset(7);
+  SpreadsheetApp.flush();
+  Utilities.sleep(180);
+  imagen
+    .setWidth(420)
+    .setHeight(64)
+    .setAnchorCellXOffset(4)
+    .setAnchorCellYOffset(3);
+  SpreadsheetApp.flush();
 }
 
 function limpiarFormulario_(conservarEstado) {

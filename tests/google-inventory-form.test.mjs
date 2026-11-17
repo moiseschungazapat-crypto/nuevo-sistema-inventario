@@ -38,6 +38,15 @@ test('puede instalar botones flotantes con un clic real',()=>{
  assert.match(script,/getRange\('A15:H15'\)\.clearContent\(\)\.clearDataValidations\(\)/);
 });
 
+test('los botones muestran una respuesta visual al hacer clic',()=>{
+ assert.match(script,/function animarBoton_\(accion\)/);
+ assert.match(script,/animarBoton_\('registrar'\)/);
+ assert.match(script,/animarBoton_\('limpiar'\)/);
+ assert.match(script,/\.setWidth\(408\)/);
+ assert.match(script,/Utilities\.sleep\(180\)/);
+ assert.match(script,/Validando el movimiento…/);
+});
+
 test('la sincronización procesa una única tabla de movimientos',()=>{
  assert.match(sync,/MOVEMENT_SHEET/);
  assert.match(sync,/pendingMovementRows/);
