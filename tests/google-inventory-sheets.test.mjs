@@ -52,5 +52,5 @@ test('prepara el panel y conserva ocultas las pestañas antiguas',async()=>{
  assert.ok(valueBodies.some(body=>body.data?.some(item=>item.range==="'Movimientos'!A20")));
  const preview=valueBodies.flatMap(body=>body.data||[]).find(item=>item.range==="'Movimientos'!H7:H10");
  assert.deepEqual(preview?.values,[[''],[''],[''],['']]);
- assert.ok(valueBodies.some(body=>body.data?.some(item=>item.range==="'Movimientos'!B15"&&item.values?.[0]?.[0]?.includes('MARCA EL CUADRO'))));
+ assert.ok(valueBodies.some(body=>body.data?.some(item=>item.range==="'Movimientos'!A15:H15"&&item.values?.[0]?.every(value=>value===''))));
 });

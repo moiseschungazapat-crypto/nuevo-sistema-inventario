@@ -58,8 +58,7 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
   {range:`'${MOVEMENT_SHEET}'!A4`,values:[['REGISTRAR MOVIMIENTO']]},
   {range:`'${MOVEMENT_SHEET}'!A6:A13`,values:[['Tipo de movimiento'],['Fecha'],['Categoría'],['Código del producto'],['Cantidad'],['Proveedor (solo entrada)'],['Vencimiento (si corresponde)'],['Observación / motivo']]},
   {range:`'${MOVEMENT_SHEET}'!F6:F10`,values:[['STOCK DEL PRODUCTO'],['Producto'],['Stock antes'],['Stock después'],['Unidad']]},
-  {range:`'${MOVEMENT_SHEET}'!B15`,values:[['MARCA EL CUADRO PARA REGISTRAR']]},
-  {range:`'${MOVEMENT_SHEET}'!F15`,values:[['MARCA EL CUADRO PARA LIMPIAR']]},
+  {range:`'${MOVEMENT_SHEET}'!A15:H15`,values:[['','','','','','','','']]},
   {range:`'${MOVEMENT_SHEET}'!A19`,values:[['HISTORIAL DE MOVIMIENTOS']]},
   {range:`'${MOVEMENT_SHEET}'!A20`,values:[MOVEMENT_HEADERS]},
  ];
@@ -70,7 +69,7 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
  await writeValues(spreadsheetId,token,[
   {range:`'${MOVEMENT_SHEET}'!H7:H10`,values:[[''],[''],[''],['']]},
  ],'RAW',request);
- if(createdMovement)await writeValues(spreadsheetId,token,[{range:`'${MOVEMENT_SHEET}'!C6:C7`,values:[['Salida'],['=TODAY()']]},{range:`'${MOVEMENT_SHEET}'!A15`,values:[[false]]},{range:`'${MOVEMENT_SHEET}'!E15`,values:[[false]]},{range:`'${MOVEMENT_SHEET}'!A17`,values:[['Completa el formulario y marca Registrar movimiento.']]}],'USER_ENTERED',request);
+ if(createdMovement)await writeValues(spreadsheetId,token,[{range:`'${MOVEMENT_SHEET}'!C6:C7`,values:[['Salida'],['=TODAY()']]},{range:`'${MOVEMENT_SHEET}'!A17`,values:[['Completa el formulario y pulsa Registrar movimiento.']]}],'USER_ENTERED',request);
 
  const format=[];
  for(const [title,row] of Object.entries(HEADERS)){
@@ -89,8 +88,7 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:5,endRowIndex:13,startColumnIndex:2,endColumnIndex:4},cell:{userEnteredFormat:{backgroundColor:{red:1,green:.98,blue:.88},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:5,endRowIndex:10,startColumnIndex:5,endColumnIndex:7},cell:{userEnteredFormat:{backgroundColor:{red:.91,green:.94,blue:.97},textFormat:{bold:true,foregroundColor:{red:.06,green:.14,blue:.22}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:6,endRowIndex:10,startColumnIndex:7,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.93,green:.98,blue:.94},textFormat:{bold:true,foregroundColor:{red:.04,green:.35,blue:.16}},horizontalAlignment:'RIGHT',verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
- format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:0,endColumnIndex:4},cell:{userEnteredFormat:{backgroundColor:{red:.06,green:.14,blue:.22},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
- format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:4,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.91,green:.45,blue:.18},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:0,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.96,green:.97,blue:.98},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:16,endRowIndex:17,startColumnIndex:0,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.9,green:.97,blue:.91},textFormat:{bold:true,foregroundColor:{red:.03,green:.38,blue:.15}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:18,endRowIndex:19,startColumnIndex:0,endColumnIndex:15},cell:{userEnteredFormat:{backgroundColor:{red:.06,green:.14,blue:.22},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:19,endRowIndex:20,startColumnIndex:0,endColumnIndex:15},cell:{userEnteredFormat:{backgroundColor:{red:.22,green:.4,blue:.57},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},wrapStrategy:'WRAP',horizontalAlignment:'CENTER',verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
@@ -105,8 +103,8 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
  format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:7,endRowIndex:8,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Catálogo'!$C$2:$C$1500"}]},strict:false,showCustomUi:true}}});
  format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:8,endRowIndex:9,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Catálogo'!$A$2:$A$1500"}]},strict:true,showCustomUi:true}}});
  format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:10,endRowIndex:11,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Proveedores'!$A$2:$A$1500"}]},strict:false,showCustomUi:true}}});
- format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:0,endColumnIndex:1},rule:{condition:{type:'BOOLEAN'},strict:true,showCustomUi:true}}});
- format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:4,endColumnIndex:5},rule:{condition:{type:'BOOLEAN'},strict:true,showCustomUi:true}}});
+ format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:0,endColumnIndex:1}}});
+ format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:4,endColumnIndex:5}}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:6,endRowIndex:7,startColumnIndex:2,endColumnIndex:3},cell:{userEnteredFormat:{numberFormat:{type:'DATE',pattern:'dd/mm/yyyy'}}},fields:'userEnteredFormat.numberFormat'}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:11,endRowIndex:12,startColumnIndex:2,endColumnIndex:3},cell:{userEnteredFormat:{numberFormat:{type:'DATE',pattern:'dd/mm/yyyy'}}},fields:'userEnteredFormat.numberFormat'}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:MOVEMENT_START_ROW-1,endRowIndex:GRID_ROWS,startColumnIndex:0,endColumnIndex:1},cell:{userEnteredFormat:{numberFormat:{type:'DATE',pattern:'dd/mm/yyyy'}}},fields:'userEnteredFormat.numberFormat'}});

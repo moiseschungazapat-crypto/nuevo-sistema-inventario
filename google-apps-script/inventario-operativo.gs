@@ -48,6 +48,7 @@ function instalarBotonesVisuales() {
   hoja.getImages()
     .filter(imagen => String(imagen.getAltTextTitle() || '').indexOf('Inventario:') === 0)
     .forEach(imagen => imagen.remove());
+  hoja.getRange('A15:H15').clearContent().clearDataValidations().setBackground('#F5F7FA');
   hoja.setRowHeight(15, 72);
   const registrar = Utilities.newBlob(Utilities.base64Decode(BOTON_REGISTRAR_PNG), 'image/png', 'registrar-movimiento.png');
   const limpiar = Utilities.newBlob(Utilities.base64Decode(BOTON_LIMPIAR_PNG), 'image/png', 'limpiar-formulario.png');
@@ -147,7 +148,6 @@ function registrarMovimiento() {
   } catch (error) {
     mostrarEstado_(error.message || 'No se pudo registrar el movimiento.', true);
   } finally {
-    hoja.getRange(INVENTARIO_CONFIG.celdas.registrar).setValue(false);
     lock.releaseLock();
   }
 }
@@ -170,8 +170,6 @@ function limpiarFormulario_(conservarEstado) {
   ]).clearContent();
   hoja.getRange(INVENTARIO_CONFIG.celdas.tipo).setValue('Salida');
   hoja.getRange(INVENTARIO_CONFIG.celdas.fecha).setValue(new Date()).setNumberFormat('dd/mm/yyyy');
-  hoja.getRange(INVENTARIO_CONFIG.celdas.registrar).setValue(false);
-  hoja.getRange(INVENTARIO_CONFIG.celdas.limpiar).setValue(false);
   actualizarVistaPrevia_();
   if (!conservarEstado) hoja.getRange(INVENTARIO_CONFIG.celdas.estado).setValue('Completa el formulario y marca Registrar movimiento.');
 }

@@ -89,7 +89,7 @@ export function createHandler({createClient,env,request=fetch}){
    const {data:updated,error:updatedError}=await client.rpc('app_datos_google_sheets_operativo');if(updatedError)throw updatedError;
    await writeReferences(spreadsheetId,token,updated,request);
    const status=rows.length===0?'No había movimientos pendientes.':`${synchronized} movimiento(s) sincronizado(s) y ${errors} con error.`;
-   await writeValues(spreadsheetId,token,[{range:`'${MOVEMENT_SHEET}'!A17`,values:[[status]]},{range:`'${MOVEMENT_SHEET}'!A15`,values:[[false]]},{range:`'${MOVEMENT_SHEET}'!E15`,values:[[false]]}],'RAW',request);
+   await writeValues(spreadsheetId,token,[{range:`'${MOVEMENT_SHEET}'!A17`,values:[[status]]}],'RAW',request);
    return json({processed:rows.length,synchronized,errors,updatedAt:new Date().toISOString(),url:`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`});
   }catch(error){
    console.error('sincronizar-inventario-sheets',error);

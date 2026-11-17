@@ -35,6 +35,7 @@ test('puede instalar botones flotantes con un clic real',()=>{
  assert.match(script,/\.assignScript\('limpiarFormulario'\)/);
  assert.match(script,/\.addItem\('Instalar botones visuales'/);
  assert.match(script,/hoja\.setRowHeight\(15, 72\)/);
+ assert.match(script,/getRange\('A15:H15'\)\.clearContent\(\)\.clearDataValidations\(\)/);
 });
 
 test('la sincronización procesa una única tabla de movimientos',()=>{
