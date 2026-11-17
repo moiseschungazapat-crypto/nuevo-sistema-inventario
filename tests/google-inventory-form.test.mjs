@@ -21,6 +21,22 @@ test('la vista previa se calcula sin fórmulas dependientes del idioma de Google
  assert.match(script,/celda === INVENTARIO_CONFIG\.celdas\.cantidad/);
 });
 
+test('las franjas grandes funcionan como botones al seleccionarlas',()=>{
+ assert.match(script,/function onSelectionChange\(e\)/);
+ assert.match(script,/columna >= 2 && columna <= 4/);
+ assert.match(script,/columna >= 6 && columna <= 8/);
+ assert.match(script,/return registrarMovimiento\(\)/);
+ assert.match(script,/return limpiarFormulario\(\)/);
+});
+
+test('puede instalar botones flotantes con un clic real',()=>{
+ assert.match(script,/function instalarBotonesVisuales\(\)/);
+ assert.match(script,/\.assignScript\('registrarMovimiento'\)/);
+ assert.match(script,/\.assignScript\('limpiarFormulario'\)/);
+ assert.match(script,/\.addItem\('Instalar botones visuales'/);
+ assert.match(script,/hoja\.setRowHeight\(15, 72\)/);
+});
+
 test('la sincronización procesa una única tabla de movimientos',()=>{
  assert.match(sync,/MOVEMENT_SHEET/);
  assert.match(sync,/pendingMovementRows/);

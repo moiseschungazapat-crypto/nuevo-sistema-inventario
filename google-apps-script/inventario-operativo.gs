@@ -23,11 +23,15 @@ const INVENTARIO_CONFIG = Object.freeze({
   },
 });
 
+const BOTON_REGISTRAR_PNG = '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';
+const BOTON_LIMPIAR_PNG = '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';
+
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Inventario')
     .addItem('Registrar movimiento', 'registrarMovimiento')
     .addItem('Limpiar formulario', 'limpiarFormulario')
+    .addItem('Instalar botones visuales', 'instalarBotonesVisuales')
     .addSeparator()
     .addItem('Ver inventario actual', 'verInventarioActual')
     .addItem('Ir al historial', 'irAlHistorial')
@@ -35,6 +39,27 @@ function onOpen() {
   const hoja = SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.hoja);
   if (hoja && !hoja.getRange(INVENTARIO_CONFIG.celdas.fecha).getValue()) hoja.getRange(INVENTARIO_CONFIG.celdas.fecha).setValue(new Date()).setNumberFormat('dd/mm/yyyy');
   actualizarVistaPrevia_();
+}
+
+function instalarBotonesVisuales() {
+  const libro = SpreadsheetApp.getActive();
+  const hoja = libro.getSheetByName(INVENTARIO_CONFIG.hoja);
+  if (!hoja) throw new Error('No existe la hoja Movimientos.');
+  hoja.getImages()
+    .filter(imagen => String(imagen.getAltTextTitle() || '').indexOf('Inventario:') === 0)
+    .forEach(imagen => imagen.remove());
+  hoja.setRowHeight(15, 72);
+  const registrar = Utilities.newBlob(Utilities.base64Decode(BOTON_REGISTRAR_PNG), 'image/png', 'registrar-movimiento.png');
+  const limpiar = Utilities.newBlob(Utilities.base64Decode(BOTON_LIMPIAR_PNG), 'image/png', 'limpiar-formulario.png');
+  hoja.insertImage(registrar, 1, 15, 4, 3)
+    .setAltTextTitle('Inventario: registrar movimiento')
+    .setAltTextDescription('Registra el formulario como movimiento pendiente.')
+    .assignScript('registrarMovimiento');
+  hoja.insertImage(limpiar, 5, 15, 4, 3)
+    .setAltTextTitle('Inventario: limpiar formulario')
+    .setAltTextDescription('Limpia todos los campos del formulario.')
+    .assignScript('limpiarFormulario');
+  libro.toast('Botones visuales instalados. Ya puedes usarlos con un solo clic.', 'Inventario', 5);
 }
 
 function onEdit(e) {
@@ -46,6 +71,25 @@ function onEdit(e) {
   if (celda === INVENTARIO_CONFIG.celdas.codigo) return completarCategoriaSeleccionada();
   if (celda === INVENTARIO_CONFIG.celdas.tipo) { actualizarAyudaTipo(); return actualizarVistaPrevia_(); }
   if (celda === INVENTARIO_CONFIG.celdas.cantidad) return actualizarVistaPrevia_();
+}
+
+// Convierte las franjas grandes de la fila 15 en botones seleccionables.
+// B15:D15 registra y F15:H15 limpia; los cuadrados A15 y E15 se conservan
+// para quienes prefieran usar casillas de verificación.
+function onSelectionChange(e) {
+  if (!e || !e.range || e.range.getSheet().getName() !== INVENTARIO_CONFIG.hoja) return;
+  const fila = e.range.getRow();
+  const columna = e.range.getColumn();
+  if (fila !== 15) return;
+  const hoja = e.range.getSheet();
+  if (columna >= 2 && columna <= 4) {
+    hoja.setActiveSelection(INVENTARIO_CONFIG.celdas.tipo);
+    return registrarMovimiento();
+  }
+  if (columna >= 6 && columna <= 8) {
+    hoja.setActiveSelection(INVENTARIO_CONFIG.celdas.tipo);
+    return limpiarFormulario();
+  }
 }
 
 function registrarMovimiento() {
