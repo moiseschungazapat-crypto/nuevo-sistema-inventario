@@ -54,3 +54,20 @@ test('prepara el panel y conserva ocultas las pestañas antiguas',async()=>{
  assert.deepEqual(preview?.values,[[''],[''],[''],['']]);
  assert.ok(valueBodies.some(body=>body.data?.some(item=>item.range==="'Movimientos'!A15:H15"&&item.values?.[0]?.every(value=>value===''))));
 });
+
+test('inventario actual consolida lotes por producto y sede sin sumar mínimos',()=>{
+ const base={codigo:'L-181',producto:'Papel Toalla',sede:'Central',unidad_medida:'unidad',stock_minimo:5};
+ const result=referenceValues({categories:[],products:[],providers:[],stock:[
+  {...base,lote:'L1',cantidad:4,vencimiento:'2026-12-20'},
+  {...base,lote:'L2',cantidad:2,vencimiento:'2026-12-10'},
+  {...base,lote:'Agotado',cantidad:0,vencimiento:'2020-01-01'},
+  {...base,sede:'Otra sede',lote:'L3',cantidad:1,vencimiento:''},
+ ]});
+ assert.equal(result.inventory.length,2);
+ assert.deepEqual(result.inventory[0],['L-181','Papel Toalla','Central',2,'2026-12-10',6,'unidad',5,'Normal']);
+ assert.equal(result.inventory[1][5],1);
+ const low=result.alerts.filter(row=>row[0]==='Stock bajo');
+ assert.equal(low.length,1);
+ assert.equal(low[0][5],1);
+ assert.ok(low[0][7].includes('Otra sede'));
+});

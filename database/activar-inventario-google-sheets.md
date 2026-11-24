@@ -42,7 +42,7 @@ npx.cmd supabase functions deploy sincronizar-inventario-sheets --project-ref qd
 
 ## 5. Activar el formulario interactivo
 
-Google Sheets necesita un pequeño Apps Script para que las casillas **Registrar movimiento** y **Limpiar formulario** funcionen tanto en computadora como en celular.
+Google Sheets necesita un Apps Script para abrir el panel lateral **Registrar movimiento** y **Limpiar formulario** desde la versión web.
 
 1. Abre la hoja operativa.
 2. Entra a **Extensiones → Apps Script**.
@@ -57,9 +57,30 @@ Google Sheets necesita un pequeño Apps Script para que las casillas **Registrar
 ## Uso
 
 - Completa el formulario superior de la pestaña `Movimientos`.
-- Marca la casilla **Registrar movimiento**. El movimiento se agregará al historial con estado `PENDIENTE`.
-- Desde el Dashboard pulsa **Sincronizar inventario** para enviarlo a Supabase y actualizar el stock.
+- Abre **Inventario → Abrir panel interactivo** y pulsa **Registrar movimiento**.
+- Con la conexión automática activada, el mismo botón envía el registro a Supabase y actualiza `Inventario actual`. El Dashboard permite sincronizar manualmente como respaldo.
 - Si una fila queda en `ERROR`, corrige los datos y cambia su estado a `PENDIENTE`.
 - No cambies el `ID interno` de una fila procesada.
 - No edites `Inventario actual`, `Catálogo`, `Proveedores` ni `Alertas`; la sincronización reemplaza su contenido.
 - En salidas, los lotes se consumen automáticamente por FEFO.
+
+## 6. Conexión automática
+
+Configuración inicial del servidor (una sola vez):
+
+1. Aplica `supabase/migrations/202611240001_google_sheets_automatico.sql`.
+2. Ejecuta `database/activar-sincronizacion-automatica.sql` con el correo del administrador que autoriza la conexión. Copia la clave resultante; la base solo conserva su hash. Ejecutar otra vez este archivo revoca la clave anterior.
+3. Publica `sincronizar-inventario-sheets`.
+
+En la hoja:
+
+1. Sustituye `Código.gs` con `google-apps-script/inventario-operativo.gs`, guarda y recarga Sheets.
+2. Selecciona **Inventario → Activar sincronización automática** y pega la clave exclusiva de la hoja. Nunca pegues una clave `service_role` ni una contraseña.
+3. Autoriza la conexión externa y el activador cuando Google lo solicite. La configuración se comparte con quienes usan esta hoja; el activador de respaldo pertenece a la cuenta que lo instala. Solo el administrador responsable debe ejecutar esta activación.
+4. Abre el panel interactivo y registra normalmente.
+
+El envío ocurre al registrar. No se considera confirmado hasta que el historial indica `SINCRONIZADO`. Ante un fallo de conexión queda `PENDIENTE`; un activador revisa pendientes cada minuto y evita llamar a Supabase cuando no hay registros nuevos. Los errores de validación requieren corregir la fila y cambiar su estado a `PENDIENTE`. No se debe cambiar el ID de operación: permite reintentar sin duplicar saldos.
+
+Los usuarios con la hoja abierta ven la actualización compartida de Google Sheets. El sitio recibe los eventos del inventario mediante su suscripción existente a Supabase Realtime; si esa conexión cae, mantiene su consulta de respaldo cada 30 segundos. No se garantiza latencia cero.
+
+Para revocar el acceso automático: `update public.google_sheets_conexiones set activo=false where spreadsheet_id='1wqU91ijwb4DXBUSG7jLeUbJmMMkgb9w4L_vtWt4wMp8';`. También queda bloqueado si se desactiva al administrador asociado.

@@ -30,6 +30,8 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Inventario')
     .addItem('Abrir panel interactivo', 'abrirPanelInventario')
+    .addItem('Activar sincronización automática', 'activarSincronizacionAutomatica')
+    .addItem('Reintentar pendientes', 'sincronizarPendientesAutomaticamente')
     .addSeparator()
     .addItem('Registrar movimiento', 'registrarMovimiento')
     .addItem('Limpiar formulario', 'limpiarFormulario')
@@ -87,12 +89,14 @@ function abrirPanelInventario() {
         estado.textContent=datos.estado||'Listo para registrar.';
         estado.classList.toggle('error',Boolean(datos.error));
       }
-      function refrescar(){google.script.run.withSuccessHandler(mostrar).obtenerResumenFormulario()}
+      let trabajando=false;
+      function refrescar(){if(!trabajando)google.script.run.withSuccessHandler(function(datos){if(!trabajando)mostrar(datos)}).obtenerResumenFormulario()}
       function ocupado(boton,texto){boton.disabled=true;boton.innerHTML='<span class="spinner"></span><span>'+texto+'</span>'}
       function restaurar(boton,icono,texto){boton.disabled=false;boton.innerHTML='<span>'+icono+'</span><span>'+texto+'</span>'}
       registrar.addEventListener('click',function(){
+        trabajando=true;limpiar.disabled=true;
         ocupado(registrar,'Procesando…');estado.textContent='Validando stock y datos del movimiento…';estado.classList.remove('error');
-        google.script.run.withSuccessHandler(function(datos){restaurar(registrar,'✓','Registrar movimiento');mostrar(datos)}).withFailureHandler(function(error){restaurar(registrar,'✓','Registrar movimiento');estado.textContent=error.message||'No se pudo registrar.';estado.classList.add('error')}).registrarDesdePanel();
+        google.script.run.withSuccessHandler(function(datos){trabajando=false;limpiar.disabled=false;restaurar(registrar,'✓','Registrar movimiento');mostrar(datos)}).withFailureHandler(function(error){trabajando=false;limpiar.disabled=false;restaurar(registrar,'✓','Registrar movimiento');estado.textContent=error.message||'No se pudo registrar.';estado.classList.add('error')}).registrarDesdePanel();
       });
       limpiar.addEventListener('click',function(){
         ocupado(limpiar,'Limpiando…');
@@ -115,6 +119,7 @@ function retirarBotonesVisuales_() {
 }
 
 function obtenerResumenFormulario() {
+  actualizarVistaPrevia_();
   const hoja = SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.hoja);
   const valor = celda => hoja.getRange(celda).getDisplayValue();
   const unidad = valor(INVENTARIO_CONFIG.celdas.unidad);
@@ -129,7 +134,7 @@ function obtenerResumenFormulario() {
     stock: stock ? stock + (unidad ? ' ' + unidad : '') : '',
     despues: despues ? despues + (unidad ? ' ' + unidad : '') : '',
     estado,
-    error: /falta|selecciona|indica|insuficiente|no se pudo|error/i.test(estado),
+    error: /falta|selecciona|indica|insuficiente|no se pudo|error|pendiente/i.test(estado),
   };
 }
 
@@ -208,6 +213,8 @@ function registrarMovimiento() {
     if (tipo === 'Salida' && Number.isFinite(stock) && cantidad > stock) return mostrarEstado_(`Stock insuficiente. Disponible: ${stock} ${producto.unidad}.`, true);
 
     const fila = Math.max(INVENTARIO_CONFIG.filaHistorial, hoja.getLastRow() + 1);
+    const operacionId = Utilities.getUuid();
+    if(fila>hoja.getMaxRows())hoja.insertRowsAfter(hoja.getMaxRows(),100);
     hoja.getRange(fila, 1, 1, 15).setValues([[
       fecha,
       tipo,
@@ -220,21 +227,84 @@ function registrarMovimiento() {
       tipo === 'Entrada' && vencimiento instanceof Date ? vencimiento : '',
       observacion,
       'PENDIENTE',
-      'Pendiente de sincronizar desde el Dashboard.',
-      Utilities.getUuid(),
+      'Esperando sincronización automática.',
+      operacionId,
       '',
       '',
     ]]);
     hoja.getRange(fila, 1).setNumberFormat('dd/mm/yyyy');
     hoja.getRange(fila, 9).setNumberFormat('dd/mm/yyyy');
-    mostrarEstado_(`${tipo} de ${cantidad} ${producto.unidad} de ${producto.nombre} agregada. Falta sincronizar desde el Dashboard.`, false);
+    mostrarEstado_('Movimiento guardado. Sincronizando inventario…', false);
     limpiarFormulario_(true);
-    libro.toast('Movimiento agregado al historial.', 'Inventario', 4);
+    SpreadsheetApp.flush();
+    try {
+      enviarSincronizacionAutomatica_(operacionId);
+      const estadoFila=texto_(hoja.getRange(fila,11).getValue());
+      if(estadoFila==='SINCRONIZADO'){
+        mostrarEstado_('Registrado y sincronizado. Inventario actualizado para todos.',false);
+        libro.toast('Inventario actualizado.', 'Inventario', 4);
+      }else{
+        mostrarEstado_(texto_(hoja.getRange(fila,12).getValue())||'Pendiente de sincronizar. Se reintentará automáticamente.',true);
+      }
+    } catch(error) {
+      mostrarEstado_('Movimiento guardado como pendiente. '+error.message,true);
+    }
   } catch (error) {
     mostrarEstado_(error.message || 'No se pudo registrar el movimiento.', true);
   } finally {
     lock.releaseLock();
   }
+}
+
+function activarSincronizacionAutomatica() {
+  const ui=SpreadsheetApp.getUi();
+  const respuesta=ui.prompt('Activar sincronización automática','Pega la clave exclusiva de esta hoja generada en Supabase.',ui.ButtonSet.OK_CANCEL);
+  if(respuesta.getSelectedButton()!==ui.Button.OK)return;
+  const clave=respuesta.getResponseText().trim();
+  if(!/^[a-f0-9]{64}$/i.test(clave))throw new Error('La clave debe tener 64 caracteres.');
+  PropertiesService.getDocumentProperties().setProperty('INVENTARIO_SYNC_TOKEN',clave);
+  try {
+    enviarSincronizacionAutomatica_(null,true);
+  } catch(error) {
+    PropertiesService.getDocumentProperties().deleteProperty('INVENTARIO_SYNC_TOKEN');
+    throw error;
+  }
+  const triggers=ScriptApp.getProjectTriggers();
+  if(!triggers.some(trigger=>trigger.getHandlerFunction()==='sincronizarPendientesAutomaticamente')){
+    ScriptApp.newTrigger('sincronizarPendientesAutomaticamente').timeBased().everyMinutes(1).create();
+  }
+  mostrarEstado_('Sincronización automática activada. Ya puedes registrar movimientos.',false);
+  ui.alert('Conexión activada. Cada registro actualizará Supabase e Inventario actual automáticamente.');
+}
+
+function enviarSincronizacionAutomatica_(operacionId,comprobar) {
+  const clave=PropertiesService.getDocumentProperties().getProperty('INVENTARIO_SYNC_TOKEN');
+  if(!clave)throw new Error('Activa la conexión desde Inventario → Activar sincronización automática.');
+  SpreadsheetApp.flush();
+  const response=UrlFetchApp.fetch('https://qdqzgvspqxtgbxubaywm.supabase.co/functions/v1/sincronizar-inventario-sheets',{
+    method:'post',contentType:'application/json',
+    headers:{'X-Inventory-Token':clave},
+    payload:JSON.stringify({operationId:operacionId||null,checkOnly:Boolean(comprobar)}),
+    muteHttpExceptions:true,
+  });
+  let result;try{result=JSON.parse(response.getContentText());}catch{throw new Error('No hubo respuesta válida. Se reintentará automáticamente.');}
+  if(response.getResponseCode()!==200||result.error)throw new Error(result.error||'La conexión no respondió. Se reintentará automáticamente.');
+  return result;
+}
+
+function sincronizarPendientesAutomaticamente() {
+  const lock=LockService.getDocumentLock();
+  if(!lock.tryLock(1000))return;
+  try {
+    const hoja=SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.hoja);
+    if(!hoja||hoja.getLastRow()<INVENTARIO_CONFIG.filaHistorial)return;
+    const estados=hoja.getRange(INVENTARIO_CONFIG.filaHistorial,11,hoja.getLastRow()-INVENTARIO_CONFIG.filaHistorial+1,1).getValues();
+    if(!estados.some(fila=>normalizar_(fila[0])==='pendiente'))return;
+    enviarSincronizacionAutomatica_();
+    actualizarVistaPrevia_();
+  } catch(error) {
+    mostrarEstado_('Hay registros pendientes. '+error.message,true);
+  } finally {lock.releaseLock();}
 }
 
 function limpiarFormulario() {

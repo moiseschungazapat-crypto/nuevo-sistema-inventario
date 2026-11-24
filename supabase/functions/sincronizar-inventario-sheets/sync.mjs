@@ -1,7 +1,7 @@
 import { DEFAULT_SPREADSHEET_ID,MOVEMENT_SHEET,MOVEMENT_START_ROW,ensureWorkbook,readValues,writeValues,writeReferences,pendingMovementRows,normalize,dateValue,numberValue } from './sheets.mjs';
 import { googleToken } from '../exportar-google-sheets/google.mjs';
 
-const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS','Content-Type':'application/json; charset=utf-8'};
+const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type, x-inventory-token','Access-Control-Allow-Methods':'POST, OPTIONS','Content-Type':'application/json; charset=utf-8'};
 const json=(body,status=200)=>new Response(JSON.stringify(body),{status,headers:cors});
 const clean=value=>String(value??'').trim();
 const message=error=>error?.message||'No se pudo procesar el registro.';
@@ -12,26 +12,38 @@ export function createHandler({createClient,env,request=fetch}){
   if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
   if(req.method!=='POST')return json({error:'Método no permitido.'},405);
   const authorization=req.headers.get('Authorization')||'';
-  if(!authorization.startsWith('Bearer '))return json({error:'Inicia sesión para sincronizar el inventario.'},401);
+  const automationToken=req.headers.get('X-Inventory-Token')||'';
+  if(!authorization.startsWith('Bearer ')&&!automationToken)return json({error:'Inicia sesión para sincronizar el inventario.'},401);
   try{
    const url=env('SUPABASE_URL'),key=env('SUPABASE_ANON_KEY'),secret=env('GOOGLE_SERVICE_ACCOUNT_JSON');
    if(!url||!key||!secret)return json({error:'Falta completar la configuración de Google Sheets en Supabase.'},503);
-   const client=createClient(url,key,{global:{headers:{Authorization:authorization}},auth:{persistSession:false,autoRefreshToken:false}});
-   const {data:user,error:authError}=await client.auth.getUser();
-   if(authError||!user?.user)return json({error:'Tu sesión venció. Inicia sesión nuevamente.'},401);
+   const spreadsheetId=env('GOOGLE_INVENTORY_SPREADSHEET_ID')||DEFAULT_SPREADSHEET_ID;
+   let client;
+   if(automationToken){
+    const serviceKey=env('SUPABASE_SERVICE_ROLE_KEY');
+    if(!serviceKey)return json({error:'Falta configurar la sincronización automática.'},503);
+    const service=createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
+    client={rpc:(name,args={})=>service.rpc('app_google_sheets_automatico',{p_token:automationToken,p_hoja:spreadsheetId,p_accion:name,p_datos:args})};
+   }else{
+    client=createClient(url,key,{global:{headers:{Authorization:authorization}},auth:{persistSession:false,autoRefreshToken:false}});
+    const {data:user,error:authError}=await client.auth.getUser();
+    if(authError||!user?.user)return json({error:'Tu sesión venció. Inicia sesión nuevamente.'},401);
+   }
    const {data:access,error:accessError}=await client.rpc('app_mi_acceso');
    if(accessError||access?.rol!=='administrador')return json({error:'Solo un administrador puede sincronizar el inventario.'},403);
    let credentials;try{credentials=JSON.parse(secret);}catch{return json({error:'La cuenta de Google configurada no es válida.'},503);}
-   const spreadsheetId=env('GOOGLE_INVENTORY_SPREADSHEET_ID')||DEFAULT_SPREADSHEET_ID;
+   let body={};try{body=await req.json();}catch{/* sincronización manual sin cuerpo */}
+   if(automationToken&&body.checkOnly)return json({connected:true});
+   const fast=Boolean(automationToken);
    const token=await googleToken(credentials,request);
-   await ensureWorkbook(spreadsheetId,token,request);
+   if(!fast)await ensureWorkbook(spreadsheetId,token,request);
    const {data:master,error:masterError}=await client.rpc('app_datos_google_sheets_operativo');
    if(masterError)throw new Error(masterError.message||'Falta aplicar la migración de sincronización.');
-   await writeReferences(spreadsheetId,token,master,request);
+   if(!fast)await writeReferences(spreadsheetId,token,master,request);
 
-   const range=`'${MOVEMENT_SHEET}'!A${MOVEMENT_START_ROW}:O1500`;
+   const range=`'${MOVEMENT_SHEET}'!A${MOVEMENT_START_ROW}:O`;
    const values=await readValues(spreadsheetId,token,[range],request);
-   const rows=pendingMovementRows(values[range]||[]);
+   const rows=pendingMovementRows(values[range]||[]).filter(row=>!fast||!body.operationId||row.cells[12]===body.operationId);
    const idWrites=[];
    for(const row of rows){
     const existing=clean(row.cells[12]);
@@ -82,13 +94,14 @@ export function createHandler({createClient,env,request=fetch}){
      synchronized++;
     }catch(error){
      errors++;
-     resultWrites.push({range:`'${MOVEMENT_SHEET}'!K${row.row}:O${row.row}`,values:[['ERROR',message(error),row.operationId,sheetDateTime(),'']]});
+     const retry=Boolean(automationToken)&&(!error?.code&&!(error instanceof Error)||error?.name==='TypeError'||error?.name==='TimeoutError'||String(error?.code||'').startsWith('08'));
+     resultWrites.push({range:`'${MOVEMENT_SHEET}'!K${row.row}:O${row.row}`,values:[[retry?'PENDIENTE':'ERROR',retry?'Conexión interrumpida. Se reintentará automáticamente.':message(error),row.operationId,sheetDateTime(),'']]});
     }
    }
    if(resultWrites.length)await writeValues(spreadsheetId,token,resultWrites,'RAW',request);
    const {data:updated,error:updatedError}=await client.rpc('app_datos_google_sheets_operativo');if(updatedError)throw updatedError;
    await writeReferences(spreadsheetId,token,updated,request);
-   const status=rows.length===0?'No había movimientos pendientes.':`${synchronized} movimiento(s) sincronizado(s) y ${errors} con error.`;
+   const status=rows.length===0?'No había movimientos pendientes.':errors?`${synchronized} movimiento(s) sincronizado(s) y ${errors} con error. Revisa Resultado.`:'Registrado y sincronizado. Inventario actualizado para todos.';
    await writeValues(spreadsheetId,token,[{range:`'${MOVEMENT_SHEET}'!A17`,values:[[status]]}],'RAW',request);
    return json({processed:rows.length,synchronized,errors,updatedAt:new Date().toISOString(),url:`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`});
   }catch(error){

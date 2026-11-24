@@ -4,7 +4,7 @@ export const MOVEMENT_START_ROW=21;
 export const MOVEMENT_HEADERS=['Fecha','Tipo','Categoría','Código producto','Producto','Cantidad','Unidad','Proveedor','Vencimiento','Observación / motivo','Estado','Resultado','ID interno','Sincronizado','Lotes usados'];
 export const HEADERS={
  [MOVEMENT_SHEET]:MOVEMENT_HEADERS,
- 'Inventario actual':['Código','Producto','Sede','Lote','Vencimiento','Cantidad','Unidad','Stock mínimo','Estado'],
+ 'Inventario actual':['Código','Producto','Sede','Lotes con stock','Próximo vencimiento','Cantidad','Unidad','Stock mínimo','Estado'],
  'Catálogo':['Código','Producto','Categoría','Unidad','Perecible'],
  'Proveedores':['Proveedor','Documento'],
  'Alertas':['Tipo','Código','Producto','Lote','Vencimiento','Cantidad','Unidad','Detalle'],
@@ -138,10 +138,24 @@ export function referenceValues(data){
  const categories=new Map(data.categories.map(row=>[String(row.id),row.nombre]));
  const catalog=data.products.map(row=>[row.codigo,row.nombre,categories.get(String(row.categoria_id))||'Sin categoría',row.unidad_medida,row.es_perecible?'Sí':'No']);
  const providers=data.providers.map(row=>[row.nombre,row.documento||'']);
- const inventory=data.stock.map(row=>[row.codigo,row.producto,row.sede,row.lote,row.vencimiento||'',Number(row.cantidad),row.unidad_medida,Number(row.stock_minimo||0),Number(row.cantidad)<=0?'Sin stock':Number(row.stock_minimo||0)>Number(row.cantidad)?'Bajo mínimo':'Normal']);
+ const totals=new Map();
+ for(const row of data.stock){
+  // Se conserva F como cantidad para el formulario y el panel lateral.
+  const key=JSON.stringify([row.codigo,row.sede,row.unidad_medida]);
+  if(!totals.has(key))totals.set(key,{...row,cantidad:0,stock_minimo:0,lotes:new Set(),vencimiento:''});
+  const total=totals.get(key),quantity=Number(row.cantidad);
+  total.cantidad+=quantity;
+  total.stock_minimo=Math.max(total.stock_minimo,Number(row.stock_minimo||0));
+  if(quantity>0){
+   if(row.lote)total.lotes.add(row.lote);
+   if(row.vencimiento&&(!total.vencimiento||row.vencimiento<total.vencimiento))total.vencimiento=row.vencimiento;
+  }
+ }
+ const inventory=Array.from(totals.values(),row=>[row.codigo,row.producto,row.sede,row.lotes.size,row.vencimiento,Number(row.cantidad.toFixed(6)),row.unidad_medida,row.stock_minimo,row.cantidad<=0?'Sin stock':row.stock_minimo>row.cantidad?'Bajo mínimo':'Normal']);
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  const alerts=[];
- for(const row of data.stock){const quantity=Number(row.cantidad);if(quantity<=0)continue;if(Number(row.stock_minimo||0)>quantity)alerts.push(['Stock bajo',row.codigo,row.producto,row.lote,row.vencimiento||'',quantity,row.unidad_medida,`Mínimo: ${row.stock_minimo}`]);if(row.vencimiento){const days=(new Date(row.vencimiento+'T00:00:00Z')-new Date(today+'T00:00:00Z'))/86400000;if(days<0)alerts.push(['Vencido',row.codigo,row.producto,row.lote,row.vencimiento,quantity,row.unidad_medida,'No usar']);else if(days<=30)alerts.push(['Por vencer',row.codigo,row.producto,row.lote,row.vencimiento,quantity,row.unidad_medida,`Vence en ${Math.ceil(days)} días`]);}}
+ for(const row of totals.values())if(row.stock_minimo>row.cantidad)alerts.push(['Stock bajo',row.codigo,row.producto,'','',Number(row.cantidad.toFixed(6)),row.unidad_medida,`Sede: ${row.sede} · Mínimo: ${row.stock_minimo}`]);
+ for(const row of data.stock){const quantity=Number(row.cantidad);if(quantity<=0)continue;if(row.vencimiento){const days=(new Date(row.vencimiento+'T00:00:00Z')-new Date(today+'T00:00:00Z'))/86400000;if(days<0)alerts.push(['Vencido',row.codigo,row.producto,row.lote,row.vencimiento,quantity,row.unidad_medida,'No usar']);else if(days<=30)alerts.push(['Por vencer',row.codigo,row.producto,row.lote,row.vencimiento,quantity,row.unidad_medida,`Vence en ${Math.ceil(days)} días`]);}}
  return {catalog,providers,inventory,alerts};
 }
 export async function writeReferences(spreadsheetId,token,data,request=fetch){
