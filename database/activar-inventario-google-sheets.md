@@ -54,6 +54,8 @@ Google Sheets necesita un Apps Script para abrir el panel lateral **Registrar mo
 5. Regresa a la hoja y vuelve a cargarla.
 6. La primera vez que uses el menú **Inventario**, Google puede solicitar autorización para modificar esa misma hoja.
 
+Para abrir el panel automáticamente al entrar, selecciona una sola vez **Inventario → Abrir panel automáticamente al entrar** y autoriza el activador de apertura. Esto muestra el panel al abrir el archivo con la pestaña `Movimientos` activa y permisos de edición en Google Sheets web. Al cambiar a otra pestaña, el panel se cierra en la siguiente comprobación (aproximadamente cinco segundos). Al regresar a `Movimientos`, puedes recuperarlo con **Inventario → Abrir panel interactivo**. También se cierra si usas la X. La apertura del panel no cambia los movimientos ni los campos del formulario; fuera de `Movimientos` sus acciones quedan bloqueadas.
+
 ## Uso
 
 - Completa el formulario superior de la pestaña `Movimientos`.

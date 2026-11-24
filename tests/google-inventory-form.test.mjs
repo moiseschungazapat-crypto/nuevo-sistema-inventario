@@ -6,6 +6,42 @@ import vm from 'node:vm';
 const script=await fs.readFile(new URL('../google-apps-script/inventario-operativo.gs',import.meta.url),'utf8');
 const sync=await fs.readFile(new URL('../supabase/functions/sincronizar-inventario-sheets/sync.mjs',import.meta.url),'utf8');
 
+test('activa la apertura del panel una sola vez para esta hoja sin duplicar activadores',()=>{
+ const triggers=[],opened=[];
+ const book={getId:()=>'sheet',toast:()=>{},getActiveSheet:()=>({getName:()=>'Movimientos'})};
+ const context=vm.createContext({
+  SpreadsheetApp:{getActive:()=>book},
+  ScriptApp:{getProjectTriggers:()=>triggers,newTrigger:handler=>({forSpreadsheet(target){assert.equal(target,book);return this;},onOpen(){return this;},create(){triggers.push({getHandlerFunction:()=>handler,getTriggerSourceId:()=>book.getId()});}})},
+ });
+ vm.runInContext(script,context);
+ context.abrirPanelInventario=arg=>opened.push(arg);
+ context.activarAperturaAutomaticaPanel();
+ context.activarAperturaAutomaticaPanel();
+ assert.equal(triggers.length,1);
+ assert.equal(opened.length,2);
+ context.mostrarPanelAlAbrir();
+ assert.equal(opened.at(-1),true);
+});
+
+test('fuera de Movimientos el panel se cierra y no registra ni limpia campos',()=>{
+ let activa='Inventario actual';
+ const context=vm.createContext({SpreadsheetApp:{getActive:()=>({getActiveSheet:()=>({getName:()=>activa})})}});
+ vm.runInContext(script,context);
+ context.actualizarVistaPrevia_=()=>{throw Error('No debe tocar el formulario');};
+ context.registrarMovimiento=()=>{throw Error('No debe registrar');};
+ context.limpiarFormulario=()=>{throw Error('No debe limpiar');};
+ context.abrirPanelInventario=()=>{throw Error('No debe abrirse en otra pestaña');};
+ for(const nombre of ['Inventario actual','Catálogo','Proveedores','Alertas']){
+  activa=nombre;
+  assert.equal(context.obtenerResumenFormulario().cerrarPanel,true);
+  assert.equal(context.registrarDesdePanel().cerrarPanel,true);
+  assert.equal(context.limpiarDesdePanel().cerrarPanel,true);
+  context.mostrarPanelAlAbrir();
+ }
+ activa='Movimientos';
+ assert.equal(context.panelEnMovimientos_(),true);
+});
+
 test('filtra por categoría y resuelve nombres con códigos sin confundir duplicados',()=>{
  const context=vm.createContext({});
  vm.runInContext(script,context);
@@ -63,7 +99,7 @@ test('los botones muestran una respuesta visual al hacer clic',()=>{
 
 test('incluye un panel lateral HTML con hover y estados de procesamiento',()=>{
  assert.match(script,/\.addItem\('Abrir panel interactivo', 'abrirPanelInventario'\)/);
- assert.match(script,/function abrirPanelInventario\(\)/);
+ assert.match(script,/function abrirPanelInventario\(soloMostrar\)/);
  assert.match(script,/showSidebar\(html\)/);
  assert.match(script,/button:hover,button:focus-visible/);
  assert.match(script,/Procesando…/);

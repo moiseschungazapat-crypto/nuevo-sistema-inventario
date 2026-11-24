@@ -30,6 +30,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Inventario')
     .addItem('Abrir panel interactivo', 'abrirPanelInventario')
+    .addItem('Abrir panel automáticamente al entrar', 'activarAperturaAutomaticaPanel')
     .addItem('Activar sincronización automática', 'activarSincronizacionAutomatica')
     .addItem('Reintentar pendientes', 'sincronizarPendientesAutomaticamente')
     .addSeparator()
@@ -44,8 +45,28 @@ function onOpen() {
   actualizarProductosPorCategoria(true);
 }
 
-function abrirPanelInventario() {
-  retirarBotonesVisuales_();
+function activarAperturaAutomaticaPanel() {
+  const libro = SpreadsheetApp.getActive();
+  const existe = ScriptApp.getProjectTriggers().some(trigger =>
+    trigger.getHandlerFunction() === 'mostrarPanelAlAbrir' &&
+    trigger.getTriggerSourceId() === libro.getId());
+  if (!existe) {
+    ScriptApp.newTrigger('mostrarPanelAlAbrir').forSpreadsheet(libro).onOpen().create();
+  }
+  abrirPanelInventario();
+  libro.toast('El panel se abrirá automáticamente al volver a entrar a esta hoja.', 'Inventario', 5);
+}
+
+function mostrarPanelAlAbrir() {
+  if (panelEnMovimientos_()) abrirPanelInventario(true);
+}
+
+function abrirPanelInventario(soloMostrar) {
+  if (!panelEnMovimientos_()) {
+    if (soloMostrar !== true) SpreadsheetApp.getActive().toast('Selecciona la pestaña Movimientos para abrir el panel.', 'Inventario', 4);
+    return;
+  }
+  if (soloMostrar !== true) retirarBotonesVisuales_();
   const html = HtmlService.createHtmlOutput(`
     <style>
       :root{font-family:Arial,sans-serif;color:#172435;color-scheme:light;background:#fff}
@@ -84,6 +105,7 @@ function abrirPanelInventario() {
       const estado=document.getElementById('estado');
       function texto(id,valor){document.getElementById(id).textContent=valor||'—'}
       function mostrar(datos){
+        if(datos.cerrarPanel){google.script.host.close();return;}
         texto('tipo',datos.tipo);texto('producto',datos.producto);texto('cantidad',datos.cantidad);
         texto('stock',datos.stock);texto('despues',datos.despues);
         estado.textContent=datos.estado||'Listo para registrar.';
@@ -119,6 +141,7 @@ function retirarBotonesVisuales_() {
 }
 
 function obtenerResumenFormulario() {
+  if (!panelEnMovimientos_()) return {cerrarPanel:true};
   actualizarVistaPrevia_();
   const hoja = SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.hoja);
   const valor = celda => hoja.getRange(celda).getDisplayValue();
@@ -139,13 +162,20 @@ function obtenerResumenFormulario() {
 }
 
 function registrarDesdePanel() {
+  if (!panelEnMovimientos_()) return {cerrarPanel:true};
   registrarMovimiento();
   return obtenerResumenFormulario();
 }
 
 function limpiarDesdePanel() {
+  if (!panelEnMovimientos_()) return {cerrarPanel:true};
   limpiarFormulario();
   return obtenerResumenFormulario();
+}
+
+function panelEnMovimientos_() {
+  const hoja = SpreadsheetApp.getActive().getActiveSheet();
+  return Boolean(hoja && hoja.getName() === INVENTARIO_CONFIG.hoja);
 }
 
 function instalarBotonesVisuales() {
