@@ -1,9 +1,27 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import test from 'node:test';
+import vm from 'node:vm';
 
 const script=await fs.readFile(new URL('../google-apps-script/inventario-operativo.gs',import.meta.url),'utf8');
 const sync=await fs.readFile(new URL('../supabase/functions/sincronizar-inventario-sheets/sync.mjs',import.meta.url),'utf8');
+
+test('filtra por categoría y resuelve nombres con códigos sin confundir duplicados',()=>{
+ const context=vm.createContext({});
+ vm.runInContext(script,context);
+ const products=[
+  {codigo:'A-162',nombre:'Cinta',categoria:'Oficina'},
+  {codigo:'T-063',nombre:'Pisco',categoria:'Bebidas alcohólicas'},
+  {codigo:'T-062',nombre:'Vino',categoria:'Bebidas alcohólicas'},
+ ];
+ context.leerCatalogo_=()=>products;
+ assert.deepEqual(Array.from(context.productosDeCategoria_(products,' Bebidas alcoholicas '),p=>p.codigo),['T-063','T-062']);
+ assert.equal(context.productosDeCategoria_(products,'').length,0);
+ assert.equal(context.etiquetaProducto_(products[1]),'Pisco — T-063');
+ assert.equal(context.buscarProducto_('Pisco — T-063').codigo,'T-063');
+ assert.equal(context.buscarProducto_('T-063').codigo,'T-063');
+ assert.equal(context.buscarProducto_('Pisco — A-162'),null);
+});
 
 test('el formulario ofrece controles compatibles con computadora y celular',()=>{
  assert.match(script,/function onOpen\(\)/);

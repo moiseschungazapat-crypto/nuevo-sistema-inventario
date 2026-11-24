@@ -101,7 +101,8 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
  format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'COLUMNS',startIndex:12,endIndex:14},properties:{hiddenByUser:true},fields:'hiddenByUser'}});
  format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:5,endRowIndex:6,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_LIST',values:[{userEnteredValue:'Entrada'},{userEnteredValue:'Salida'}]},strict:true,showCustomUi:true}}});
  format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:7,endRowIndex:8,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Catálogo'!$C$2:$C$1500"}]},strict:false,showCustomUi:true}}});
- format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:8,endRowIndex:9,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Catálogo'!$A$2:$A$1500"}]},strict:true,showCustomUi:true}}});
+ // Apps Script administra el desplegable de productos según la categoría.
+ // No reemplazar su lista filtrada por el catálogo completo al sincronizar.
  format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:10,endRowIndex:11,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_RANGE',values:[{userEnteredValue:"='Proveedores'!$A$2:$A$1500"}]},strict:false,showCustomUi:true}}});
  format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:0,endColumnIndex:1}}});
  format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:4,endColumnIndex:5}}});

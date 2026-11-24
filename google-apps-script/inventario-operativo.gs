@@ -39,7 +39,7 @@ function onOpen() {
     .addToUi();
   const hoja = SpreadsheetApp.getActive().getSheetByName(INVENTARIO_CONFIG.hoja);
   if (hoja && !hoja.getRange(INVENTARIO_CONFIG.celdas.fecha).getValue()) hoja.getRange(INVENTARIO_CONFIG.celdas.fecha).setValue(new Date()).setNumberFormat('dd/mm/yyyy');
-  actualizarVistaPrevia_();
+  actualizarProductosPorCategoria(true);
 }
 
 function abrirPanelInventario() {
@@ -279,21 +279,26 @@ function limpiarFormulario_(conservarEstado) {
   ]).clearContent();
   hoja.getRange(INVENTARIO_CONFIG.celdas.tipo).setValue('Salida');
   hoja.getRange(INVENTARIO_CONFIG.celdas.fecha).setValue(new Date()).setNumberFormat('dd/mm/yyyy');
+  hoja.getRange(INVENTARIO_CONFIG.celdas.codigo).clearDataValidations();
   actualizarVistaPrevia_();
   if (!conservarEstado) hoja.getRange(INVENTARIO_CONFIG.celdas.estado).setValue('Completa el formulario y marca Registrar movimiento.');
 }
 
-function actualizarProductosPorCategoria() {
+function actualizarProductosPorCategoria(conservarSeleccion) {
   const libro = SpreadsheetApp.getActive();
   const hoja = libro.getSheetByName(INVENTARIO_CONFIG.hoja);
   const categoria = texto_(hoja.getRange(INVENTARIO_CONFIG.celdas.categoria).getValue());
-  const productos = leerCatalogo_().filter(item => !categoria || normalizar_(item.categoria) === normalizar_(categoria));
-  const codigos = productos.map(item => item.codigo);
-  const celda = hoja.getRange(INVENTARIO_CONFIG.celdas.codigo).clearContent();
+  const productos = productosDeCategoria_(leerCatalogo_(), categoria);
+  const codigos = productos.map(etiquetaProducto_);
+  const celda = hoja.getRange(INVENTARIO_CONFIG.celdas.codigo);
+  const anterior = buscarProducto_(texto_(celda.getValue()));
+  celda.clearDataValidations().clearContent();
+  hoja.getRange('A9').setValue('Producto (nombre y código)');
   if (codigos.length) celda.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(codigos, true).setAllowInvalid(false).build());
   else celda.clearDataValidations();
+  if (conservarSeleccion === true && anterior && productos.some(item => item.codigo === anterior.codigo)) celda.setValue(etiquetaProducto_(anterior));
   actualizarVistaPrevia_();
-  mostrarEstado_(codigos.length ? `${codigos.length} producto(s) disponibles en ${categoria}.` : 'No hay productos activos en esa categoría.', codigos.length === 0);
+  mostrarEstado_(!categoria ? 'Selecciona primero una categoría.' : codigos.length ? `${codigos.length} producto(s) disponibles en ${categoria}.` : 'No hay productos activos en esa categoría.', Boolean(categoria) && codigos.length === 0);
 }
 
 function completarCategoriaSeleccionada() {
@@ -371,7 +376,17 @@ function leerCatalogo_() {
 
 function buscarProducto_(codigo) {
   const buscado = normalizar_(codigo);
-  return leerCatalogo_().find(item => normalizar_(item.codigo) === buscado) || null;
+  return leerCatalogo_().find(item => normalizar_(item.codigo) === buscado || normalizar_(etiquetaProducto_(item)) === buscado) || null;
+}
+
+function etiquetaProducto_(producto) {
+  return producto.nombre + ' — ' + producto.codigo;
+}
+
+function productosDeCategoria_(productos, categoria) {
+  const buscada = normalizar_(categoria);
+  return buscada ? productos.filter(item => normalizar_(item.categoria) === buscada)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')) : [];
 }
 
 function mostrarEstado_(mensaje, error) {
