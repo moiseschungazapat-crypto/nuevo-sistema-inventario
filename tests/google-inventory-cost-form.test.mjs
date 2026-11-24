@@ -2,6 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import {readFile} from 'node:fs/promises';
+import {entryCostTotal} from '../js/utils/entry-cost.js';
+
+test('Apps Script usa sintaxis compatible y coincide con el cálculo decimal del servidor',async()=>{
+ const script=await readFile(new URL('../google-apps-script/inventario-operativo.gs',import.meta.url),'utf8');
+ assert.doesNotMatch(script,/\b\d+n\b|\bBigInt\s*\(/);
+ const context=vm.createContext({});vm.runInContext(script,context);
+ for(const quantity of [0,.001,.125,1,3,100.125,999999999]){
+  for(const cost of [0,.0001,1.005,2.675,3.14,100.1234,999999.9999]){
+   assert.equal(context.costoTotalEntrada_(quantity,cost),entryCostTotal(quantity,cost),quantity+' × '+cost);
+  }
+ }
+});
 
 test('Sheets exige costo en entradas, guarda costo y total, y permite salidas sin costo',async()=>{
  const script=await readFile(new URL('../google-apps-script/inventario-operativo.gs',import.meta.url),'utf8');

@@ -459,9 +459,21 @@ function actualizarVistaPrevia_() {
 
 function costoTotalEntrada_(cantidad,costo) {
   if(!Number.isFinite(Number(cantidad))||!Number.isFinite(Number(costo))||Number(cantidad)<0||Number(costo)<0||Number(cantidad)>999999999||Number(costo)>999999999999.99)return 0;
-  const q=BigInt(Number(cantidad).toFixed(3).replace('.',''));
-  const c=BigInt(Number(costo).toFixed(4).replace('.',''));
-  return Number((q*c+50000n)/100000n)/100;
+  // Multiplicación decimal por dígitos: el editor de Apps Script rechaza
+  // los literales de enteros grandes aunque otros entornos JavaScript los admitan.
+  const q=Number(cantidad).toFixed(3).replace('.','');
+  const c=Number(costo).toFixed(4).replace('.','');
+  const digitos=Array(q.length+c.length).fill(0);
+  for(let i=q.length-1;i>=0;i--){
+    for(let j=c.length-1;j>=0;j--)digitos[i+j+1]+=Number(q[i])*Number(c[j]);
+  }
+  for(let k=digitos.length-1;k>0;k--){
+    digitos[k-1]+=Math.floor(digitos[k]/10);
+    digitos[k]%=10;
+  }
+  const producto=digitos.join('').replace(/^0+/,'').padStart(6,'0');
+  const centimos=Number(producto.slice(0,-5))+(Number(producto[producto.length-5])>=5?1:0);
+  return centimos/100;
 }
 
 function actualizarCamposCosto_() {

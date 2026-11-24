@@ -62,6 +62,13 @@ export const supabase={
  async rpc(name,args={}){
   const data=db();
   if(name==='app_mi_acceso')return {data:data.auth_perfiles[0],error:null};
+  if(name==='app_resumen_gastos_inicio'){
+   localStorage.setItem('test-finance-summary-calls',String(Number(localStorage.getItem('test-finance-summary-calls')||0)+1));
+   if(data.auth_perfiles[0].rol!=='administrador')return {error:{code:'42501'}};
+   const periodo=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()).slice(0,7)+'-01';
+   const gastos=(data.gastos||[]).filter(row=>row.fecha.slice(0,7)===periodo.slice(0,7));
+   return {data:{periodo,total:gastos.reduce((sum,row)=>sum+Number(row.monto),0),cantidad:gastos.length},error:null};
+  }
   if(['app_gastos_mes','app_guardar_gasto','app_pagar_gasto','app_presupuesto_gastos'].includes(name)){
    if(data.auth_perfiles[0].rol!=='administrador')return {error:{code:'42501'}};
    data.gastos||=[];data.gastos_presupuestos||={};

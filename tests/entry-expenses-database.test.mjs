@@ -25,7 +25,7 @@ test('entradas y gastos se confirman juntos, sin duplicar; salidas no generan ga
    create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
    grant usage on schema auth to authenticated,anon;
    create table public.categorias(id bigserial primary key,nombre text);create table public.proveedores(id bigserial primary key,nombre text);create table public.sedes(id bigserial primary key,nombre text);create table public.productos(id bigserial primary key,nombre text,codigo text);create table public.inventario(id bigserial primary key,producto_id bigint,sede_id bigint,cantidad integer default 0,unique(producto_id,sede_id));create table public.movimientos(id bigserial primary key);`);
-  for(const name of ['202609150001_auth_access.sql','202609150002_inventory_modules.sql','202609150004_recepciones.sql','202609150006_catalogo_recepciones.sql','202610200014_recepcion_lotes_automaticos.sql','202611130018_google_sheets_operativo.sql','202611240002_gastos_administracion.sql','202611240003_costos_entradas_gastos.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+  for(const name of ['202609150001_auth_access.sql','202609150002_inventory_modules.sql','202609150004_recepciones.sql','202609150006_catalogo_recepciones.sql','202610200014_recepcion_lotes_automaticos.sql','202611130018_google_sheets_operativo.sql','202611240002_gastos_administracion.sql','202611240003_costos_entradas_gastos.sql','202611240004_resumen_gastos_inicio.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
   await db.exec(`insert into auth.users values('${admin}','admin@test.local'),('${operator}','operator@test.local');insert into public.auth_perfiles(user_id,nombre,activo,rol)values('${admin}','Admin',true,'administrador'),('${operator}','Operador',true,'operador');insert into public.productos(id,nombre,codigo,unidad_medida,es_perecible)values(1,'Arroz','P1','kg',false);insert into public.proveedores(id,nombre)values(1,'Proveedor');insert into public.sedes(id,nombre)values(1,'Central');select set_config('request.jwt.claim.sub','${admin}',false);set role authenticated;`);
   const date=(await db.query("select (now() at time zone 'America/Lima')::date::text as d")).rows[0].d;
   const input=()=>({operacion_id:crypto.randomUUID(),proveedor_id:'1',sede_id:'1',tipo_comprobante:'Ingreso de inventario',serie:'INT',numero:crypto.randomUUID(),fecha_emision:date,fecha_recepcion:date,responsable:'Admin',detalles:[{producto_id:'1',cantidad_recibida:10,precio_unitario:2.5}]});
@@ -46,6 +46,8 @@ test('entradas y gastos se confirman juntos, sin duplicar; salidas no generan ga
   const args=[crypto.randomUUID(),'1',lot,'1',2,'DOC','Entrada inicial',3];
   const manual=()=>db.query('select public.app_registrar_entrada_con_costo($1,$2,$3,$4,$5,$6,$7,$8)',args);
   await manual();await manual();assert.equal(await stock(),22);assert.equal((await summary()).cantidad,3);assert.equal(Number((await summary()).total),56);
+  const preview=(await db.query('select public.app_resumen_gastos_inicio() as data')).rows[0].data;
+  assert.equal(Number(preview.total),56);assert.equal(preview.cantidad,3);assert.equal(preview.periodo,date.slice(0,7)+'-01');
   await assert.rejects(db.query('select public.app_registrar_entrada_con_costo($1,$2,$3,$4,$5,$6,$7,$8)',[...args.slice(0,7),4]),/otro costo/);
   await db.query("select public.app_registrar_movimiento($1,'salida','1',$2,'1',null,1,'','Consumo')",[crypto.randomUUID(),lot]);
   assert.equal(await stock(),21);assert.equal((await summary()).cantidad,3);
@@ -55,5 +57,6 @@ test('entradas y gastos se confirman juntos, sin duplicar; salidas no generan ga
   await db.exec('reset role;drop trigger fallo_prueba on public.movimientos;drop function public.fallo_movimiento_prueba();set role authenticated;');
   await db.exec(`reset role;select set_config('request.jwt.claim.sub','${operator}',false);set role authenticated;`);
   await save(input());assert.equal((await db.query('select * from public.gastos')).rows.length,0);await assert.rejects(summary(),/administrador/);
+  await assert.rejects(db.query('select public.app_resumen_gastos_inicio()'),/administrador/);
  }finally{await db.close();}
 });

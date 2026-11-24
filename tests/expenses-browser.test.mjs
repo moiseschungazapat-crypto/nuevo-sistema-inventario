@@ -42,6 +42,11 @@ test('gastos: entradas con costo, reporte sin pendientes y acceso restringido en
   assert.match(download.suggestedFilename(),/^gastos-\d{4}-\d{2}\.xlsx$/);
   const report=await readFile(await download.path());assert.match(report.toString('utf8'),/TOTAL GASTADO/);assert.match(report.toString('utf8'),/Harina de trigo/);assert.doesNotMatch(report.toString('utf8'),/Servicio de limpieza/);
   await page.locator('#expense-search').fill('');
+  await page.goto(base+'/dashboard.html');await page.locator('#overview-expense-total').getByText(/1[,.]210/).waitFor();
+  assert.equal(await page.locator('#overview-expense-preview a').getAttribute('href'),'gastos.html');
+  await page.evaluate(()=>{const data=JSON.parse(localStorage.getItem('browser-test-database'));data.gastos[0].monto=1210;localStorage.setItem('browser-test-database',JSON.stringify(data));const channel=new BroadcastChannel('test-realtime');channel.postMessage('change');channel.close();});
+  await page.locator('#overview-expense-total').getByText(/1[,.]220/).waitFor();
+  await page.goto(url);await page.locator('#expense-kpis .kpi-card').first().waitFor();
   await mkdir(resolve(root,'test-results'),{recursive:true});await page.screenshot({path:resolve(root,'test-results/gastos-desktop.png'),fullPage:true});
   await page.locator('#theme-toggle').click();await page.screenshot({path:resolve(root,'test-results/gastos-dark.png'),fullPage:true});
   await page.setViewportSize({width:390,height:844});
@@ -51,6 +56,10 @@ test('gastos: entradas con costo, reporte sin pendientes y acceso restringido en
   await page.evaluate(()=>{const data=JSON.parse(localStorage.getItem('browser-test-database'));data.auth_perfiles[0].rol='operador';localStorage.setItem('browser-test-database',JSON.stringify(data));});
   await page.goto(url);await page.getByText('No tienes permisos para consultar esta sección.',{exact:true}).waitFor();
   assert.equal(await page.locator('a[href="gastos.html"]:visible').count(),0);assert.equal(await page.locator('#new-expense').count(),0);
+  const calls=await page.evaluate(()=>localStorage.getItem('test-finance-summary-calls'));
+  await page.goto(base+'/dashboard.html');await page.locator('.activity-column').first().waitFor();
+  assert.equal(await page.locator('#overview-expense-preview').count(),0);
+  assert.equal(await page.evaluate(()=>localStorage.getItem('test-finance-summary-calls')),calls);
   assert.deepEqual(errors,[]);
  }finally{await browser?.close();await new Promise(done=>server.close(done));}
 });
