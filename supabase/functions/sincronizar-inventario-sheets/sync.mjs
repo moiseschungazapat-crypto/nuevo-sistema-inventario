@@ -43,7 +43,7 @@ export function createHandler({createClient,env,request=fetch}){
 
    const range=`'${MOVEMENT_SHEET}'!A${MOVEMENT_START_ROW}:O`;
    const values=await readValues(spreadsheetId,token,[range],request);
-   const rows=pendingMovementRows(values[range]||[]).filter(row=>!fast||!body.operationId||row.cells[12]===body.operationId);
+   const rows=body.refreshOnly?[]:pendingMovementRows(values[range]||[]).filter(row=>!fast||!body.operationId||row.cells[12]===body.operationId);
    const idWrites=[];
    for(const row of rows){
     const existing=clean(row.cells[12]);
@@ -100,10 +100,10 @@ export function createHandler({createClient,env,request=fetch}){
    }
    if(resultWrites.length)await writeValues(spreadsheetId,token,resultWrites,'RAW',request);
    const {data:updated,error:updatedError}=await client.rpc('app_datos_google_sheets_operativo');if(updatedError)throw updatedError;
-   await writeReferences(spreadsheetId,token,updated,request);
-   const status=rows.length===0?'No había movimientos pendientes.':errors?`${synchronized} movimiento(s) sincronizado(s) y ${errors} con error. Revisa Resultado.`:'Registrado y sincronizado. Inventario actualizado para todos.';
+   const refreshed=await writeReferences(spreadsheetId,token,updated,request);
+   const status=body.refreshOnly?'Inventario y alertas actualizados.':rows.length===0?'No había movimientos pendientes.':errors?`${synchronized} movimiento(s) sincronizado(s) y ${errors} con error. Revisa Resultado.`:'Registrado y sincronizado. Inventario actualizado para todos.';
    await writeValues(spreadsheetId,token,[{range:`'${MOVEMENT_SHEET}'!A17`,values:[[status]]}],'RAW',request);
-   return json({processed:rows.length,synchronized,errors,updatedAt:new Date().toISOString(),url:`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`});
+   return json({processed:rows.length,synchronized,errors,alerts:refreshed.alerts,updatedAt:new Date().toISOString(),url:`https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`});
   }catch(error){
    console.error('sincronizar-inventario-sheets',error);
    const safe=message(error);return json({error:/^(No se pud|Falta |La cuenta |Solo |Tu sesión|No existe)/.test(safe)?safe:'No se pudo sincronizar la hoja. Revisa la configuración y vuelve a intentar.'},502);

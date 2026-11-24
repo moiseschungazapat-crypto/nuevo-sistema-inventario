@@ -154,7 +154,10 @@ export function referenceValues(data){
  const inventory=Array.from(totals.values(),row=>[row.codigo,row.producto,row.sede,row.lotes.size,row.vencimiento,Number(row.cantidad.toFixed(6)),row.unidad_medida,row.stock_minimo,row.cantidad<=0?'Sin stock':row.stock_minimo>row.cantidad?'Bajo mínimo':'Normal']);
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  const alerts=[];
- for(const row of totals.values())if(row.stock_minimo>row.cantidad)alerts.push(['Stock bajo',row.codigo,row.producto,'','',Number(row.cantidad.toFixed(6)),row.unidad_medida,`Sede: ${row.sede} · Mínimo: ${row.stock_minimo}`]);
+ for(const row of totals.values()){
+  if(row.cantidad<=0)alerts.push(['Sin stock',row.codigo,row.producto,'','',Number(row.cantidad.toFixed(6)),row.unidad_medida,`Sede: ${row.sede} · Producto agotado.`]);
+  else if(row.stock_minimo>row.cantidad)alerts.push(['Stock bajo',row.codigo,row.producto,'','',Number(row.cantidad.toFixed(6)),row.unidad_medida,`Sede: ${row.sede} · Mínimo: ${row.stock_minimo}`]);
+ }
  for(const row of data.stock){const quantity=Number(row.cantidad);if(quantity<=0)continue;if(row.vencimiento){const days=(new Date(row.vencimiento+'T00:00:00Z')-new Date(today+'T00:00:00Z'))/86400000;if(days<0)alerts.push(['Vencido',row.codigo,row.producto,row.lote,row.vencimiento,quantity,row.unidad_medida,'No usar']);else if(days<=30)alerts.push(['Por vencer',row.codigo,row.producto,row.lote,row.vencimiento,quantity,row.unidad_medida,`Vence en ${Math.ceil(days)} días`]);}}
  return {catalog,providers,inventory,alerts};
 }
@@ -166,6 +169,7 @@ export async function writeReferences(spreadsheetId,token,data,request=fetch){
  if(rows.catalog.length)updates.push({range:"'Catálogo'!A2",values:rows.catalog});
  if(rows.providers.length)updates.push({range:"'Proveedores'!A2",values:rows.providers});
  if(rows.inventory.length)updates.push({range:"'Inventario actual'!A2",values:rows.inventory});
- if(rows.alerts.length)updates.push({range:"'Alertas'!A2",values:rows.alerts});
+ updates.push({range:"'Alertas'!A2",values:rows.alerts.length?rows.alerts:[['Sin alertas activas','','','','','','','No se detectaron productos agotados, bajo mínimo ni lotes vencidos o próximos a vencer.']]});
  if(updates.length)await writeValues(spreadsheetId,token,updates,'RAW',request);
+ return {alerts:rows.alerts.length,inventory:rows.inventory.length};
 }

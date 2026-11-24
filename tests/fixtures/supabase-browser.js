@@ -10,7 +10,7 @@ const initial={
  lotes:[{id:'l1',producto_id:'p1',codigo:'HAR-2026-09',vencimiento:'2099-10-20'}],
  inventario:[{id:'i1',producto_id:'p1',sede_id:'s1',lote_id:'l1',cantidad:25}],
  inventario_minimos:[{id:'mi1',producto_id:'p1',sede_id:'s1',minimo:10}],
- movimientos:[], operations:{},recepciones:[],recepcion_detalles:[],receiptOperations:{},
+ movimientos:[], operations:{},recepciones:[],recepcion_detalles:[],receiptOperations:{},gastos:[],gastos_presupuestos:{},
  auditoria:[{fecha:'2026-10-20T19:40:48Z',tabla:'lotes',operacion:'INSERT',actor_nombre:'Ana Administradora',actor_email:'admin@example.test',resumen:JSON.stringify({id:'technical-id',codigo:'REC-20261020-01',producto_id:'p1',vencimiento:'2026-10-24',documento_origen:'Factura HDA000123-1234',created_at:'2026-10-20T19:40:48Z'})}]
 };
 function db(){return JSON.parse(localStorage.getItem(key)||JSON.stringify(initial));}
@@ -62,6 +62,22 @@ export const supabase={
  async rpc(name,args={}){
   const data=db();
   if(name==='app_mi_acceso')return {data:data.auth_perfiles[0],error:null};
+  if(['app_gastos_mes','app_guardar_gasto','app_pagar_gasto','app_presupuesto_gastos'].includes(name)){
+   if(data.auth_perfiles[0].rol!=='administrador')return {error:{code:'42501'}};
+   data.gastos||=[];data.gastos_presupuestos||={};
+   if(name==='app_gastos_mes'){
+    const gastos=data.gastos.filter(row=>row.fecha.slice(0,7)===args.p_mes.slice(0,7));
+    return {data:{gastos,cantidad:gastos.length,total:gastos.reduce((sum,row)=>sum+Number(row.monto),0),pagado:gastos.filter(row=>row.estado==='pagado').reduce((sum,row)=>sum+Number(row.monto),0),pendiente:gastos.filter(row=>row.estado==='pendiente').reduce((sum,row)=>sum+Number(row.monto),0),presupuesto:data.gastos_presupuestos[args.p_mes]||null},error:null};
+   }
+   if(name==='app_guardar_gasto'){
+    const row=args.p_id?data.gastos.find(row=>row.id===args.p_id):null;
+    if(row)Object.assign(row,args.p_datos,{version:row.version+1});
+    else if(!data.gastos.some(row=>row.id===args.p_operacion))data.gastos.push({...args.p_datos,id:args.p_operacion,version:1});
+   }
+   if(name==='app_pagar_gasto'){const row=data.gastos.find(row=>row.id===args.p_id);Object.assign(row,{estado:'pagado',fecha_pago:row.fecha,version:row.version+1});}
+   if(name==='app_presupuesto_gastos')data.gastos_presupuestos[args.p_mes]={monto:args.p_monto,version:1};
+   save(data);return {data:{},error:null};
+  }
   if(name==='app_listar_recepciones')return {data:data.recepciones||[],error:null};
   if(name==='app_registrar_recepcion_simple'){
    const r=args.p_recepcion;

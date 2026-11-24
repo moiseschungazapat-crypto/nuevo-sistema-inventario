@@ -6,12 +6,14 @@ import { usersPage } from './pages/users.js';
 import { overviewPage } from './pages/overview.js';
 import { auditPage } from './pages/audit.js';
 import { receptionsPage } from './pages/receptions.js';
+import { expensesPage } from './pages/expenses.js';
 import { e } from './components/ui.js';
 export async function startPage(section, pageOptions = {}) {
  const root=document.getElementById('page-content');
  try{
   const access=await rpc('app_mi_acceso');
   document.getElementById('user-role').textContent=access.rol;
+  document.querySelectorAll('[data-admin-only]').forEach(node=>{node.hidden=access.rol!=='administrador';});
   let page;
   if(section==='catalogo')page=await catalogHubPage(root,access,pageOptions.view);
   else if(catalogConfig[section])page=await catalogPage(root,section,access);
@@ -20,6 +22,7 @@ export async function startPage(section, pageOptions = {}) {
   else if(section==='usuarios')page=await usersPage(root,access);
   else if(section==='auditoria')page=await auditPage(root,access);
   else if(section==='recepciones')page=await receptionsPage(root,access);
+  else if(section==='gastos')page=await expensesPage(root,access);
   else page=await overviewPage(root,access);
   if(page.tables.length)watchTables(page.tables,page.refresh);
   else document.getElementById('sync-state').textContent='Sesión validada';

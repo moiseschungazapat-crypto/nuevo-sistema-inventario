@@ -32,7 +32,7 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    for(const section of ['dashboard','productos','categorias','proveedores','sedes','inventario','movimientos','reportes','usuarios']){
     await page.goto(base+'/'+section+'.html');
     await page.locator('#sync-state.connected').waitFor();
-    assert.equal(await page.locator('.sidebar-menu a').count(),10);
+    assert.equal(await page.locator('.sidebar-menu a').count(),11);
     assert.equal(await page.locator('.menu-item.active').getAttribute('href'),(['productos','categorias'].includes(section)?'catalogo':section)+'.html');
     assert.equal(await page.locator('#load-error:visible').count(),0);
    }

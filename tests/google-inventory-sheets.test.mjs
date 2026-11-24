@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {HEADERS,MOVEMENT_HEADERS,MOVEMENT_START_ROW,DEFAULT_SPREADSHEET_ID,dateValue,numberValue,normalize,pendingMovementRows,referenceValues,ensureWorkbook} from '../supabase/functions/sincronizar-inventario-sheets/sheets.mjs';
+import {HEADERS,MOVEMENT_HEADERS,MOVEMENT_START_ROW,DEFAULT_SPREADSHEET_ID,dateValue,numberValue,normalize,pendingMovementRows,referenceValues,ensureWorkbook,writeReferences} from '../supabase/functions/sincronizar-inventario-sheets/sheets.mjs';
 
 test('la hoja operativa usa un solo formulario e historial de movimientos',()=>{
  assert.equal(DEFAULT_SPREADSHEET_ID,'1wqU91ijwb4DXBUSG7jLeUbJmMMkgb9w4L_vtWt4wMp8');
@@ -70,4 +70,26 @@ test('inventario actual consolida lotes por producto y sede sin sumar mínimos',
  assert.equal(low.length,1);
  assert.equal(low[0][5],1);
  assert.ok(low[0][7].includes('Otra sede'));
+});
+
+test('avisa agotados sin mínimo, sin duplicar lotes ni alertar por un lote vacío con saldo total',()=>{
+ const base={producto:'Papel',sede:'Central',unidad_medida:'unidad',stock_minimo:0,vencimiento:''};
+ const result=referenceValues({categories:[],products:[],providers:[],stock:[
+  {...base,codigo:'P1',lote:'L1',cantidad:0},
+  {...base,codigo:'P1',lote:'L2',cantidad:0},
+  {...base,codigo:'P2',lote:'L3',cantidad:0},
+  {...base,codigo:'P2',lote:'L4',cantidad:5},
+ ]});
+ assert.equal(result.alerts.length,1);
+ assert.equal(result.alerts[0][0],'Sin stock');
+ assert.equal(result.alerts[0][1],'P1');
+});
+
+test('cuando no hay alertas escribe un mensaje explícito',async()=>{
+ const writes=[];
+ await writeReferences('sheet','token',{categories:[],products:[],providers:[],stock:[]},async(url,options)=>{
+  if(url.includes('/values:batchUpdate'))writes.push(...JSON.parse(options.body).data);
+  return new Response('{}',{status:200});
+ });
+ assert.equal(writes.find(row=>row.range==="'Alertas'!A2").values[0][0],'Sin alertas activas');
 });

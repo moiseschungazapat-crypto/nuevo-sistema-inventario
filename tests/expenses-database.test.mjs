@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {PGlite} from '@electric-sql/pglite';
+
+test('gastos privados: permisos, cálculos exactos, reintentos y edición concurrente',async()=>{
+ const db=new PGlite(),admin='11111111-1111-4111-8111-111111111111',operator='22222222-2222-4222-8222-222222222222';
+ try{
+  await db.exec(`create role anon;create role authenticated;create schema auth;create table auth.users(id uuid primary key,email text);
+   create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+   grant usage on schema auth to authenticated,anon;
+   insert into auth.users values('${admin}','admin@test.local'),('${operator}','operator@test.local');`);
+  for(const name of ['202609150001_auth_access.sql','202609150002_inventory_modules.sql','202611240002_gastos_administracion.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+  await db.exec(`insert into public.auth_perfiles(user_id,nombre,activo,rol) values('${admin}','Jefe',true,'administrador'),('${operator}','Operador',true,'operador');`);
+  const as=async id=>{await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id]);await db.exec('set role authenticated');};
+  await as(admin);
+  const date=(await db.query("select (now() at time zone 'America/Lima')::date::text as day")).rows[0].day;
+  const month=date.slice(0,7)+'-01';
+  const input={fecha:date,concepto:'Compra de insumos',categoria:'Mercadería',monto:'0.10',estado:'pendiente',proveedor:'Proveedor',observaciones:''};
+  const save=async(operation,values=input,id=null,version=null)=>(await db.query('select public.app_guardar_gasto($1,$2,$3,$4) as data',[operation,JSON.stringify(values),id,version])).rows[0].data;
+  const op=crypto.randomUUID(),created=await save(op);
+  assert.equal((await save(op)).id,created.id);
+  await assert.rejects(save(op,{...input,monto:'9'}),/otro gasto/);
+  await save(crypto.randomUUID(),{...input,monto:'0.20',estado:'pagado',fecha_pago:date});
+  const summary=async(period=month)=>(await db.query('select public.app_gastos_mes($1) as data',[period])).rows[0].data;
+  let totals=await summary();assert.equal(Number(totals.total),.30);assert.equal(Number(totals.pagado),.20);assert.equal(Number(totals.pendiente),.10);assert.equal(totals.cantidad,2);assert.equal(totals.presupuesto,null);
+  assert.ok(!('solicitud_inicial' in totals.gastos[0]));
+  const paid=(await db.query('select public.app_pagar_gasto($1,$2) as data',[created.id,created.version])).rows[0].data;
+  assert.equal(paid.estado,'pagado');assert.equal(paid.version,2);
+  await assert.rejects(db.query('select public.app_pagar_gasto($1,$2)',[created.id,created.version]),/ya está pagado/);
+  await assert.rejects(save(crypto.randomUUID(),input,created.id,created.version),/Otro administrador/);
+  const edited=await save(crypto.randomUUID(),{...input,concepto:'Insumos corregidos'},created.id,paid.version);assert.equal(edited.concepto,'Insumos corregidos');assert.equal(edited.estado,'pendiente');assert.equal(edited.fecha_pago,null);
+  await db.query('select public.app_presupuesto_gastos($1,100,null)',[month]);
+  assert.equal(Number((await summary()).presupuesto.monto),100);
+  await assert.rejects(db.query('select public.app_presupuesto_gastos($1,200,null)',[month]),/presupuesto cambió/);
+  await db.query('select public.app_presupuesto_gastos($1,200,1)',[month]);
+  assert.equal((await summary()).presupuesto.version,2);
+  const other='2001-01-01';assert.equal((await summary(other)).cantidad,0);assert.equal((await summary(other)).presupuesto,null);
+  for(const monto of ['0','-1','1.001','1000000000000'])await assert.rejects(save(crypto.randomUUID(),{...input,monto}),/monto válido/);
+  await assert.rejects(save(crypto.randomUUID(),{...input,categoria:'Desconocida'}),/categoría/);
+  await assert.rejects(db.query('update public.gastos set monto=999'),/permission denied/);
+  assert.ok((await db.query("select * from public.auditoria where tabla='gastos'")).rows.length>=4);
+  assert.equal((await db.query('select count(*) as n from public.movimientos')).rows[0].n,0);
+  await as(operator);
+  assert.equal((await db.query('select * from public.gastos')).rows.length,0);
+  assert.equal((await db.query('select * from public.gastos_presupuestos')).rows.length,0);
+  for(const query of [()=>summary(),()=>save(crypto.randomUUID()),()=>db.query('select public.app_pagar_gasto($1,1)',[created.id]),()=>db.query('select public.app_presupuesto_gastos($1,100,null)',[month])])await assert.rejects(query(),/administrador/);
+  await db.exec('reset role;set role anon');await assert.rejects(db.query('select * from public.gastos'),/permission denied/);
+ }finally{await db.close();}
+});

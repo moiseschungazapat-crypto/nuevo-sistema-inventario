@@ -7,9 +7,9 @@ const primarySections = [
 ];
 const sectionGroups = [
  {id:'settings',label:'Configuración',icon:'gear',children:[['catalogo','Catálogo','boxes-stacked'],['proveedores','Proveedores','truck'],['sedes','Sedes','building']]},
- {id:'administration',label:'Administración',icon:'diamond',children:[['auditoria','Auditoría','clipboard-list'],['usuarios','Usuarios','users']]},
+ {id:'administration',label:'Administración',icon:'diamond',children:[['gastos','Gastos','wallet'],['auditoria','Auditoría','clipboard-list'],['usuarios','Usuarios','users']]},
 ];
-const sectionLink = ([key,label,icon],section,submenu=false) => `<a href="${key}.html" class="menu-item ${submenu?'submenu-item ':''}${key===section?'active':''}" ${key===section?'aria-current="page"':''}><i class="fa-solid fa-${icon}" aria-hidden="true"></i><span>${label}</span></a>`;
+const sectionLink = ([key,label,icon],section,submenu=false) => `<a href="${key}.html" ${key==='gastos'?'data-admin-only hidden':''} class="menu-item ${submenu?'submenu-item ':''}${key===section?'active':''}" ${key===section?'aria-current="page"':''}><i class="fa-solid fa-${icon}" aria-hidden="true"></i><span>${label}</span></a>`;
 const sectionGroup = (group,section) => {
  const open=group.children.some(([key])=>key===section);
  return `<div class="menu-group ${open?'open has-active':''}" data-menu-group="${group.id}">
