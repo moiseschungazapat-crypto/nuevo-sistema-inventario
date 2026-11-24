@@ -67,19 +67,19 @@ export const supabase={
    data.gastos||=[];data.gastos_presupuestos||={};
    if(name==='app_gastos_mes'){
     const gastos=data.gastos.filter(row=>row.fecha.slice(0,7)===args.p_mes.slice(0,7));
-    return {data:{gastos,cantidad:gastos.length,total:gastos.reduce((sum,row)=>sum+Number(row.monto),0),pagado:gastos.filter(row=>row.estado==='pagado').reduce((sum,row)=>sum+Number(row.monto),0),pendiente:gastos.filter(row=>row.estado==='pendiente').reduce((sum,row)=>sum+Number(row.monto),0),presupuesto:data.gastos_presupuestos[args.p_mes]||null},error:null};
+    return {data:{gastos,cantidad:gastos.length,total:gastos.reduce((sum,row)=>sum+Number(row.monto),0),total_productos:gastos.filter(row=>row.origen!=='manual').reduce((sum,row)=>sum+Number(row.monto),0),total_otros:gastos.filter(row=>row.origen==='manual').reduce((sum,row)=>sum+Number(row.monto),0),productos:new Set(gastos.map(row=>row.producto_codigo).filter(Boolean)).size},error:null};
    }
    if(name==='app_guardar_gasto'){
     const row=args.p_id?data.gastos.find(row=>row.id===args.p_id):null;
     if(row)Object.assign(row,args.p_datos,{version:row.version+1});
-    else if(!data.gastos.some(row=>row.id===args.p_operacion))data.gastos.push({...args.p_datos,id:args.p_operacion,version:1});
+    else if(!data.gastos.some(row=>row.id===args.p_operacion))data.gastos.push({...args.p_datos,id:args.p_operacion,version:1,origen:'manual'});
    }
    if(name==='app_pagar_gasto'){const row=data.gastos.find(row=>row.id===args.p_id);Object.assign(row,{estado:'pagado',fecha_pago:row.fecha,version:row.version+1});}
    if(name==='app_presupuesto_gastos')data.gastos_presupuestos[args.p_mes]={monto:args.p_monto,version:1};
    save(data);return {data:{},error:null};
   }
   if(name==='app_listar_recepciones')return {data:data.recepciones||[],error:null};
-  if(name==='app_registrar_recepcion_simple'){
+  if(name==='app_registrar_recepcion_simple'||name==='app_registrar_recepcion_con_costo'){
    const r=args.p_recepcion;
    if(data.receiptOperations?.[r.operacion_id])return {data:data.receiptOperations[r.operacion_id],error:null};
    const id=crypto.randomUUID();
@@ -92,6 +92,7 @@ export const supabase={
      if(balance)balance.cantidad+=d.cantidad_recibida;else data.inventario.push({id:crypto.randomUUID(),producto_id:d.producto_id,lote_id:lotId,sede_id:r.sede_id,cantidad:d.cantidad_recibida});
     }
     (data.recepcion_detalles||=[]).push({...d,recepcion_id:id,lote_id:lotId});
+    if(d.precio_unitario>0)(data.gastos||=[]).push({id:crypto.randomUUID(),fecha:r.fecha_recepcion,concepto:'Ingreso: '+product.nombre,categoria:'Mercadería',monto:Math.round(d.cantidad_recibida*d.precio_unitario*100)/100,origen:'recepcion',producto_codigo:product.codigo,producto_nombre:product.nombre,cantidad:d.cantidad_recibida,unidad:product.unidad_medida,costo_unitario:d.precio_unitario,proveedor:'Proveedor',version:1});
    }
    (data.recepciones||=[]).push({...r,id,created_at:new Date().toISOString(),proveedor:'Proveedor',sede:'La Liguria S.A.',productos:r.detalles.map(d=>data.productos.find(p=>p.id===d.producto_id)?.nombre).join(', '),facturado:r.detalles.reduce((s,d)=>s+d.cantidad_facturada,0),recibido:r.detalles.reduce((s,d)=>s+d.cantidad_recibida,0),faltante:0,archivos:0});
    (data.receiptOperations||={})[r.operacion_id]=id;save(data);
@@ -107,7 +108,8 @@ export const supabase={
    if(existing)existing.minimo=args.p_minimo;else data.inventario_minimos.push({id:crypto.randomUUID(),producto_id:args.p_producto,sede_id:args.p_sede,minimo:args.p_minimo});
    save(data);return {data:null,error:null};
   }
-  if(name==='app_registrar_movimiento'){
+  if(name==='app_registrar_movimiento'||name==='app_registrar_entrada_con_costo'){
+   if(name==='app_registrar_entrada_con_costo')args={...args,p_tipo:'entrada'};
    if(data.operations[args.p_operacion])return {data:{id:data.operations[args.p_operacion],repetido:true},error:null};
    const id=crypto.randomUUID();
    data.movimientos.push({id,fecha:new Date().toISOString(),tipo:args.p_tipo,producto_id:args.p_producto,lote_id:args.p_lote,sede_id:args.p_sede,destino_id:args.p_destino,cantidad:args.p_cantidad,responsable:'Ana Administradora',documento:args.p_documento,motivo:args.p_motivo});

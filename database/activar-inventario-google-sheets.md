@@ -86,3 +86,15 @@ El envío ocurre al registrar. No se considera confirmado hasta que el historial
 Los usuarios con la hoja abierta ven la actualización compartida de Google Sheets. El sitio recibe los eventos del inventario mediante su suscripción existente a Supabase Realtime; si esa conexión cae, mantiene su consulta de respaldo cada 30 segundos. No se garantiza latencia cero.
 
 Para revocar el acceso automático: `update public.google_sheets_conexiones set activo=false where spreadsheet_id='1wqU91ijwb4DXBUSG7jLeUbJmMMkgb9w4L_vtWt4wMp8';`. También queda bloqueado si se desactiva al administrador asociado.
+
+## 7. Entradas con costo y gastos automáticos
+
+- Aplica `202611240003_costos_entradas_gastos.sql` después de `202611240002_gastos_administracion.sql` y publica la función de sincronización actualizada.
+- Reemplaza `Código.gs` por el archivo actual del proyecto, guarda y recarga. La conexión automática ya guardada se conserva.
+- En `Movimientos`, al seleccionar **Entrada**, aparece **Costo unitario (S/)** en `H12`. Indica el costo por kg, litro o unidad base (hasta cuatro decimales). `H13` muestra el total redondeado a céntimos. En **Salida** estos campos se limpian y no se piden.
+- El historial conserva las columnas existentes; se añaden **P: Costo unitario** y **Q: Total entrada**. No se insertan columnas intermedias para conservar los identificadores e historial previo.
+- Cada entrada con costo genera un gasto privado por producto en la misma transacción que el ingreso. Las salidas y ajustes no generan compras. Reintentar una misma operación no duplica el gasto.
+- Una fila pendiente antigua sin costo necesita completar P y volver a marcar su estado `PENDIENTE`. Las entradas históricas ya sincronizadas sin precio no se convierten en gastos estimados.
+- En la web, **Recepciones** pide el costo unitario de cada línea y calcula su total. Las entradas manuales excepcionales también usan costo.
+- El administrador consulta **Administración → Gastos** y descarga el reporte Excel del mes. Se agrupa por producto y unidad, se suman los importes en soles y se incluye el total general. Se respetan la búsqueda y categoría elegidas, exportando todos los registros filtrados, no solo la página visible.
+- No se muestran pagos pendientes ni presupuestos. Los registros y tablas anteriores se conservan; no se eliminan datos al simplificar la interfaz. Los gastos automáticos conservan el precio de origen y no se editan como gastos independientes.

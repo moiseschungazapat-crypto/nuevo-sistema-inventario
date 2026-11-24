@@ -69,6 +69,7 @@ export async function movementsPage(root,access,report=false){
    field('producto_id','Producto',{required:true,choices:options(products.filter(p=>(p.estado||String(p.id)===data.producto_id)&&p.controla_inventario!==false),data.producto_id)})+
    field('lote_id','Lote',{required:true,choices:'',help:flow==='entrada'?'Si necesitas preparar un lote, usa Recepciones → Lotes manuales (opcional).':'Selecciona el lote del que se retirarán o ajustarán las existencias.'})+
    field('cantidad','Cantidad en la unidad base del producto',{type:'number',required:true,min:0.001,step:'0.001',value:data.cantidad||''})+
+   (flow==='entrada'?field('costo_unitario','Costo unitario de entrada (S/)',{type:'number',required:true,min:0.0001,step:'0.0001',value:data.costo_unitario||'',help:'Por unidad base. El gasto se calculará con la cantidad ingresada.'}):'')+
    field('documento','Documento / referencia',{value:data.documento||'',maxLength:120})+
    field('motivo','Motivo',{type:'textarea',required:true,value:data.motivo||'',maxLength:1000})+
    `<p class="muted full-width">Sede de operación: ${e(operationalSiteLabel(mainSite))}</p>`+
@@ -86,17 +87,20 @@ export async function movementsPage(root,access,report=false){
     }
     product.onchange=fillLots;lot.onchange=info;type.onchange=info;fillLots();
     if(pending){for(const control of form.querySelectorAll('input,select,textarea')) control.disabled=true;}
+    if(pending&&flow==='entrada'&&!Number(data.costo_unitario))form.elements.costo_unitario.disabled=false;
    },
    save:async values=>{
     values.sede_id=String(mainSite.id);
     values.destino_id=null;
     if(!pending){
+     if(values.tipo==='entrada'&&(!Number.isFinite(Number(values.costo_unitario))||Number(values.costo_unitario)<=0))throw new Error('Indica el costo unitario de entrada.');
      if(!allowed.some(([key])=>key===values.tipo))throw new Error('El tipo de operación no corresponde a este formulario.');
      const validated=validateMovement(values);
      pending={key:crypto.randomUUID(),values:validated};
      // Conservar la misma operación en reintentos y recargas. Si storage falla, no enviar.
      localStorage.setItem(pendingKey,JSON.stringify(pending));
     }else{
+     if(pending.values.tipo==='entrada'&&!Number(pending.values.costo_unitario))pending.values.costo_unitario=values.costo_unitario;
      // Una operación pendiente creada antes del modo de sede única no puede
      // conservar un traslado ni una sede elegida manualmente.
      pending.values.sede_id=String(mainSite.id);
@@ -107,7 +111,8 @@ export async function movementsPage(root,access,report=false){
     showPending();
     const v=pending.values;
     try{
-     await rpc('app_registrar_movimiento',{p_operacion:pending.key,p_tipo:v.tipo,p_producto:v.producto_id,p_lote:v.lote_id,p_sede:v.sede_id,p_destino:v.destino_id,p_cantidad:v.cantidad,p_documento:v.documento||'',p_motivo:v.motivo});
+     if(v.tipo==='entrada')await rpc('app_registrar_entrada_con_costo',{p_operacion:pending.key,p_producto:v.producto_id,p_lote:v.lote_id,p_sede:v.sede_id,p_cantidad:v.cantidad,p_documento:v.documento||'',p_motivo:v.motivo,p_costo_unitario:Number(v.costo_unitario)});
+     else await rpc('app_registrar_movimiento',{p_operacion:pending.key,p_tipo:v.tipo,p_producto:v.producto_id,p_lote:v.lote_id,p_sede:v.sede_id,p_destino:v.destino_id,p_cantidad:v.cantidad,p_documento:v.documento||'',p_motivo:v.motivo});
     }catch(error){
      if(['P0001','42501','23514','23503','22P02','22003','PGRST202'].includes(error.code)){
       localStorage.removeItem(pendingKey);pending=null;showPending();

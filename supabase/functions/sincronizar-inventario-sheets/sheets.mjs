@@ -1,7 +1,8 @@
+export {entryCostTotal} from '../../../js/utils/entry-cost.js';
 export const DEFAULT_SPREADSHEET_ID='1wqU91ijwb4DXBUSG7jLeUbJmMMkgb9w4L_vtWt4wMp8';
 export const MOVEMENT_SHEET='Movimientos';
 export const MOVEMENT_START_ROW=21;
-export const MOVEMENT_HEADERS=['Fecha','Tipo','Categoría','Código producto','Producto','Cantidad','Unidad','Proveedor','Vencimiento','Observación / motivo','Estado','Resultado','ID interno','Sincronizado','Lotes usados'];
+export const MOVEMENT_HEADERS=['Fecha','Tipo','Categoría','Código producto','Producto','Cantidad','Unidad','Proveedor','Vencimiento','Observación / motivo','Estado','Resultado','ID interno','Sincronizado','Lotes usados','Costo unitario (S/)','Total entrada (S/)'];
 export const HEADERS={
  [MOVEMENT_SHEET]:MOVEMENT_HEADERS,
  'Inventario actual':['Código','Producto','Sede','Lotes con stock','Próximo vencimiento','Cantidad','Unidad','Stock mínimo','Estado'],
@@ -90,13 +91,13 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:6,endRowIndex:10,startColumnIndex:7,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.93,green:.98,blue:.94},textFormat:{bold:true,foregroundColor:{red:.04,green:.35,blue:.16}},horizontalAlignment:'RIGHT',verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:14,endRowIndex:15,startColumnIndex:0,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.96,green:.97,blue:.98},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:16,endRowIndex:17,startColumnIndex:0,endColumnIndex:8},cell:{userEnteredFormat:{backgroundColor:{red:.9,green:.97,blue:.91},textFormat:{bold:true,foregroundColor:{red:.03,green:.38,blue:.15}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
- format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:18,endRowIndex:19,startColumnIndex:0,endColumnIndex:15},cell:{userEnteredFormat:{backgroundColor:{red:.06,green:.14,blue:.22},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
- format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:19,endRowIndex:20,startColumnIndex:0,endColumnIndex:15},cell:{userEnteredFormat:{backgroundColor:{red:.22,green:.4,blue:.57},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},wrapStrategy:'WRAP',horizontalAlignment:'CENTER',verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:18,endRowIndex:19,startColumnIndex:0,endColumnIndex:17},cell:{userEnteredFormat:{backgroundColor:{red:.06,green:.14,blue:.22},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
+ format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:19,endRowIndex:20,startColumnIndex:0,endColumnIndex:17},cell:{userEnteredFormat:{backgroundColor:{red:.22,green:.4,blue:.57},textFormat:{bold:true,foregroundColor:{red:1,green:1,blue:1}},wrapStrategy:'WRAP',horizontalAlignment:'CENTER',verticalAlignment:'MIDDLE'}},fields:'userEnteredFormat'}});
  format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'ROWS',startIndex:0,endIndex:1},properties:{pixelSize:44},fields:'pixelSize'}});
  format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'ROWS',startIndex:3,endIndex:4},properties:{pixelSize:34},fields:'pixelSize'}});
  format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'ROWS',startIndex:14,endIndex:15},properties:{pixelSize:38},fields:'pixelSize'}});
  format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'ROWS',startIndex:19,endIndex:20},properties:{pixelSize:42},fields:'pixelSize'}});
- const movementWidths=[110,190,175,125,220,95,95,185,125,230,115,260,220,160,240];
+ const movementWidths=[110,190,175,125,220,95,95,185,125,230,115,260,220,160,240,150,150];
  movementWidths.forEach((pixelSize,index)=>format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'COLUMNS',startIndex:index,endIndex:index+1},properties:{pixelSize},fields:'pixelSize'}}));
  format.push({updateDimensionProperties:{range:{sheetId:movementId,dimension:'COLUMNS',startIndex:12,endIndex:14},properties:{hiddenByUser:true},fields:'hiddenByUser'}});
  format.push({setDataValidation:{range:{sheetId:movementId,startRowIndex:5,endRowIndex:6,startColumnIndex:2,endColumnIndex:3},rule:{condition:{type:'ONE_OF_LIST',values:[{userEnteredValue:'Entrada'},{userEnteredValue:'Salida'}]},strict:true,showCustomUi:true}}});
@@ -110,7 +111,7 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:11,endRowIndex:12,startColumnIndex:2,endColumnIndex:3},cell:{userEnteredFormat:{numberFormat:{type:'DATE',pattern:'dd/mm/yyyy'}}},fields:'userEnteredFormat.numberFormat'}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:MOVEMENT_START_ROW-1,endRowIndex:GRID_ROWS,startColumnIndex:0,endColumnIndex:1},cell:{userEnteredFormat:{numberFormat:{type:'DATE',pattern:'dd/mm/yyyy'}}},fields:'userEnteredFormat.numberFormat'}});
  format.push({repeatCell:{range:{sheetId:movementId,startRowIndex:MOVEMENT_START_ROW-1,endRowIndex:GRID_ROWS,startColumnIndex:8,endColumnIndex:9},cell:{userEnteredFormat:{numberFormat:{type:'DATE',pattern:'dd/mm/yyyy'}}},fields:'userEnteredFormat.numberFormat'}});
- if(createdMovement)format.push({setBasicFilter:{filter:{range:{sheetId:movementId,startRowIndex:19,endRowIndex:GRID_ROWS,startColumnIndex:0,endColumnIndex:15}}}});
+ if(createdMovement)format.push({setBasicFilter:{filter:{range:{sheetId:movementId,startRowIndex:19,endRowIndex:GRID_ROWS,startColumnIndex:0,endColumnIndex:17}}}});
 
  const widths={
   'Inventario actual':[110,220,160,210,115,95,95,110,115],
@@ -128,7 +129,7 @@ export async function ensureWorkbook(spreadsheetId,token,request=fetch){
 
 export async function readValues(spreadsheetId,token,ranges,request=fetch){
  const query=ranges.map(range=>'ranges='+encodeURIComponent(range)).join('&');
- const data=await requestJson(await request(api(spreadsheetId)+'/values:batchGet?majorDimension=ROWS&'+query,{headers:headers(token),signal:AbortSignal.timeout(30000)}),'No se pudieron leer los registros de la hoja.');
+ const data=await requestJson(await request(api(spreadsheetId)+'/values:batchGet?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING&'+query,{headers:headers(token),signal:AbortSignal.timeout(30000)}),'No se pudieron leer los registros de la hoja.');
  return Object.fromEntries((data.valueRanges||[]).map((range,index)=>[ranges[index],range.values||[]]));
 }
 export async function writeValues(spreadsheetId,token,data,valueInputOption='RAW',request=fetch){

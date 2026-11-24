@@ -1,4 +1,4 @@
-import { DEFAULT_SPREADSHEET_ID,MOVEMENT_SHEET,MOVEMENT_START_ROW,ensureWorkbook,readValues,writeValues,writeReferences,pendingMovementRows,normalize,dateValue,numberValue } from './sheets.mjs';
+import { DEFAULT_SPREADSHEET_ID,MOVEMENT_SHEET,MOVEMENT_START_ROW,ensureWorkbook,readValues,writeValues,writeReferences,pendingMovementRows,normalize,dateValue,numberValue,entryCostTotal } from './sheets.mjs';
 import { googleToken } from '../exportar-google-sheets/google.mjs';
 
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type, x-inventory-token','Access-Control-Allow-Methods':'POST, OPTIONS','Content-Type':'application/json; charset=utf-8'};
@@ -41,7 +41,7 @@ export function createHandler({createClient,env,request=fetch}){
    if(masterError)throw new Error(masterError.message||'Falta aplicar la migración de sincronización.');
    if(!fast)await writeReferences(spreadsheetId,token,master,request);
 
-   const range=`'${MOVEMENT_SHEET}'!A${MOVEMENT_START_ROW}:O`;
+   const range=`'${MOVEMENT_SHEET}'!A${MOVEMENT_START_ROW}:Q`;
    const values=await readValues(spreadsheetId,token,[range],request);
    const rows=body.refreshOnly?[]:pendingMovementRows(values[range]||[]).filter(row=>!fast||!body.operationId||row.cells[12]===body.operationId);
    const idWrites=[];
@@ -68,6 +68,7 @@ export function createHandler({createClient,env,request=fetch}){
      const provider=providers.get(normalize(row.cells[7]));
      const expiration=dateValue(row.cells[8]);
      const note=clean(row.cells[9]);
+     const unitCost=numberValue(row.cells[15]);
      if(!['entrada','salida'].includes(type))throw new Error('Selecciona Entrada o Salida.');
      if(!date)throw new Error('Indica una fecha válida.');
      if(!product)throw new Error('El código del producto no existe o está inactivo.');
@@ -76,14 +77,16 @@ export function createHandler({createClient,env,request=fetch}){
      resultWrites.push({range:`'${MOVEMENT_SHEET}'!G${row.row}`,values:[[product.unidad_medida]]});
 
      if(type==='entrada'){
+      if(!Number.isFinite(unitCost)||unitCost<=0)throw new Error('Falta el costo unitario de entrada en soles (columna P). Corrige y cambia Estado a PENDIENTE.');
       if(!provider)throw new Error('Selecciona un proveedor activo para la entrada.');
       if(product.es_perecible&&!expiration)throw new Error(`Falta el vencimiento de ${product.nombre}.`);
       const receipt={
        proveedor_id:String(provider.id),tipo_comprobante:'Ingreso de inventario',serie:'GS',numero:row.operationId.replaceAll('-','').slice(0,24).toUpperCase(),
        fecha_emision:date,fecha_recepcion:date,sede_id:String(site.id),responsable:access.nombre||'Sincronización Google Sheets',observaciones:note||null,
-       detalles:[{producto_id:String(product.id),lote_id:null,codigo_lote:null,vencimiento:expiration||null,cantidad_facturada:quantity,cantidad_recibida:quantity,unidad:product.unidad_medida,precio_unitario:null}],
+       detalles:[{producto_id:String(product.id),lote_id:null,codigo_lote:null,vencimiento:expiration||null,cantidad_facturada:quantity,cantidad_recibida:quantity,unidad:product.unidad_medida,precio_unitario:unitCost}],
       };
       const {error}=await client.rpc('app_registrar_recepcion_google_sheets',{p_operacion:row.operationId,p_recepcion:receipt});if(error)throw error;
+      resultWrites.push({range:`'${MOVEMENT_SHEET}'!Q${row.row}`,values:[[entryCostTotal(quantity,unitCost)]]});
       resultWrites.push({range:`'${MOVEMENT_SHEET}'!K${row.row}:O${row.row}`,values:[['SINCRONIZADO','Entrada registrada.',row.operationId,sheetDateTime(),'']]});
      }else{
       if(!note)throw new Error('Indica el motivo de la salida.');

@@ -138,6 +138,7 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
     await page.goto(base+'/recepciones.html');await page.locator('#new-reception').click();
     await page.locator('[name=proveedor_id]').selectOption('pr1');
     await page.locator('[name=categoria_0]').selectOption('c1');await page.locator('[name=producto_0]').selectOption('p1');await page.locator('[name=recibida_0]').fill('20');
+    await page.locator('[name=costo_0]').fill('2.5');
     assert.equal(await page.locator('[name=caducidad_0]').isDisabled(),true);
     await page.locator('[name=vencimiento_0]').fill('2099-10-31');
     await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();await page.locator('#editor').waitFor({state:'hidden'});
@@ -151,11 +152,13 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
    try{
     await page.locator('[name=proveedor_id]').selectOption('pr1');
     await page.locator('[name=categoria_0]').selectOption('c1');await page.locator('[name=producto_0]').selectOption('p1');await page.locator('[name=recibida_0]').fill('4');
+    await page.locator('[name=costo_0]').fill('2.5');
     await page.locator('[name=caducidad_0]').selectOption('fecha');
     await page.locator('[name=vencimiento_0]').fill('2099-12-31');
     assert.equal(await page.locator('[name=lote_0]').isVisible(),false);
     await page.locator('#add-reception-line').click();
     await page.locator('[name=categoria_1]').selectOption('c1');await page.locator('[name=producto_1]').selectOption('p1');await page.locator('[name=recibida_1]').fill('2');
+    await page.locator('[name=costo_1]').fill('3');
     await page.locator('[name=caducidad_1]').selectOption('ninguno');
     await page.screenshot({path:resolve(root,'test-results/recepcion-simple.png'),fullPage:true});
     await page.evaluate(()=>localStorage.setItem('test-reception-network-failure','once'));
@@ -220,6 +223,7 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
     assert.equal(await page.locator('#editor-title').textContent(),'Reintentar movimiento pendiente');
     assert.equal(await page.locator('[name=tipo]').inputValue(),'entrada');
     assert.equal(await page.locator('[name=tipo]').isDisabled(),true);
+    await page.locator('[name=costo_unitario]').fill('2.5');
     await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();await page.locator('#editor').waitFor({state:'hidden'});
     assert.equal(await page.evaluate(key=>localStorage.getItem(key),key),null);
     assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('browser-test-database')).movimientos.at(-1).tipo),'entrada');

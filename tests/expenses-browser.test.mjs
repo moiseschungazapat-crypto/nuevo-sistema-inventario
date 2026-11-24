@@ -7,7 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {resolve,extname,sep} from 'node:path';
 import {chromium} from 'playwright';
 
-test('gastos: formulario, pagos, presupuesto, filtros y acceso restringido en navegador',async()=>{
+test('gastos: entradas con costo, reporte sin pendientes y acceso restringido en navegador',async()=>{
  const root=resolve(fileURLToPath(new URL('..',import.meta.url)));
  const server=createServer(async(req,res)=>{
   try{const path=resolve(root,'.'+new URL(req.url,'http://localhost').pathname);if(!path.startsWith(root+sep))throw Error('path');
@@ -24,18 +24,24 @@ test('gastos: formulario, pagos, presupuesto, filtros y acceso restringido en na
   await page.route('**/js/supabase.js',route=>route.fulfill({contentType:'text/javascript',path:resolve(root,'tests/fixtures/supabase-browser.js')}));
   const url='http://127.0.0.1:'+server.address().port+'/gastos.html';
   await page.goto(url);await page.locator('#new-expense').waitFor();
-  assert.match(await page.locator('#expense-kpis').innerText(),/Sin configurar/);
+  assert.equal(await page.locator('#expense-state, #expense-budget, [data-expense-pay]').count(),0);
   await page.locator('#new-expense').click();
-  await page.locator('[name=concepto]').fill('Compra de insumos');await page.locator('[name=monto]').fill('1200');await page.locator('[name=estado]').selectOption('pendiente');
+  await page.locator('[name=concepto]').fill('Servicio de limpieza');await page.locator('[name=monto]').fill('1200');
   await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();await page.locator('#editor').waitFor({state:'hidden'});
-  assert.match(await page.locator('#expense-results').innerText(),/Compra de insumos/);
-  await page.locator('[data-expense-pay]').click();await page.locator('[data-confirm-yes]').click();
-  await page.getByText('Pago confirmado.',{exact:true}).waitFor();
-  assert.match(await page.locator('#expense-results').innerText(),/Pagado/);
-  await page.locator('#expense-budget').click();await page.locator('[name=monto]').fill('6000');await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();await page.locator('#editor').waitFor({state:'hidden'});
-  assert.match(await page.locator('#expense-kpis').innerText(),/4[,.]800/);
-  await page.locator('#expense-state').selectOption('pendiente');assert.equal(await page.locator('[data-expense-edit]').count(),0);
-  await page.locator('#expense-state').selectOption('');
+  assert.match(await page.locator('#expense-results').innerText(),/Servicio de limpieza/);
+  const base='http://127.0.0.1:'+server.address().port;
+  await page.goto(base+'/recepciones.html');await page.locator('#new-reception').click();
+  await page.locator('[name=proveedor_id]').selectOption('pr1');await page.locator('[name=categoria_0]').selectOption('c1');await page.locator('[name=producto_0]').selectOption('p1');await page.locator('[name=recibida_0]').fill('4');await page.locator('[name=costo_0]').fill('2.5');
+  assert.match(await page.locator('[data-line-total]').innerText(),/10[,.]00/);
+  await page.locator('#save-editor').click();await page.locator('[data-confirm-yes]').click();await page.locator('#editor').waitFor({state:'hidden'});
+  await page.goto(url);await page.locator('#expense-results').getByText('Harina de trigo',{exact:true}).waitFor();
+  assert.match(await page.locator('#expense-kpis').innerText(),/1[,.]210/);
+  assert.equal(await page.locator('[data-expense-edit]').count(),1);
+  await page.locator('#expense-search').fill('Harina');
+  const downloadPromise=page.waitForEvent('download');await page.locator('#export-expenses').click();const download=await downloadPromise;
+  assert.match(download.suggestedFilename(),/^gastos-\d{4}-\d{2}\.xlsx$/);
+  const report=await readFile(await download.path());assert.match(report.toString('utf8'),/TOTAL GASTADO/);assert.match(report.toString('utf8'),/Harina de trigo/);assert.doesNotMatch(report.toString('utf8'),/Servicio de limpieza/);
+  await page.locator('#expense-search').fill('');
   await mkdir(resolve(root,'test-results'),{recursive:true});await page.screenshot({path:resolve(root,'test-results/gastos-desktop.png'),fullPage:true});
   await page.locator('#theme-toggle').click();await page.screenshot({path:resolve(root,'test-results/gastos-dark.png'),fullPage:true});
   await page.setViewportSize({width:390,height:844});

@@ -2,6 +2,7 @@ import { allRows, rpc } from '../services/data.js';
 import { heading, e, table, field, options, openEditor, notice, loadError } from '../components/ui.js';
 import { operationalSite, operationalSiteError, operationalSiteLabel } from '../utils/single-site.js';
 import { confirmAction } from '../components/confirmation.js';
+import {entryCostTotal} from '../utils/entry-cost.js';
 
 const productLabel = product => `${product.codigo || 'Sin código'} · ${product.nombre}`;
 const limaToday = () => new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -44,6 +45,8 @@ export async function receptionsPage(root, access) {
    ${field('categoria_'+index,'Categoría',{required,choices:options(categories.filter(category=>category.estado),'','Seleccionar categoría…'),help:'Primero elige el grupo del producto.'})}
    ${field('producto_'+index,'Producto',{required,choices:'<option value="">Primero elige una categoría…</option>',help:'Solo se mostrarán productos de la categoría elegida.'})}
    ${field('recibida_'+index,'Cantidad recibida',{type:'number',required,min:0.001,step:'0.001',help:'Cantidad física que estás ingresando.'})}
+   ${field('costo_'+index,'Costo unitario (S/)',{type:'number',required,min:0.0001,step:'0.0001',help:'Costo por kg, litro o unidad base. Genera el gasto automáticamente.'})}
+   <p class="muted reception-cost-total" data-line-total>Total: S/ 0.00</p>
    <div class="reception-expiry">
     ${field('caducidad_'+index,'Vencimiento',{choices:'<option value="ninguno">Sin vencimiento</option><option value="fecha">Tiene vencimiento</option>'})}
     ${field('vencimiento_'+index,'Fecha de vencimiento',{type:'date'})}
@@ -57,6 +60,7 @@ export async function receptionsPage(root, access) {
   const categoryControl = lineNode.querySelector('[name^="categoria_"]');
   const productControl = lineNode.querySelector('[name^="producto_"]');
   const quantityControl = lineNode.querySelector('[name^="recibida_"]');
+  const costControl = lineNode.querySelector('[name^="costo_"]');
   const unitControl = lineNode.querySelector('[name^="unidad_"]');
   const modeControl = lineNode.querySelector('[name^="caducidad_"]');
   const expirationControl = lineNode.querySelector('[name^="vencimiento_"]');
@@ -67,12 +71,15 @@ export async function receptionsPage(root, access) {
   productControl.disabled = !categoryControl.value;
   lineNode.dataset.category = categoryControl.value;
   const product = products.find(row=>String(row.id)===productControl.value);
+  costControl.required=Boolean(product);
   const changed = lineNode.dataset.product !== productControl.value;
   if (changed) {
    lineNode.dataset.product = productControl.value;
+   costControl.value='';
    expirationControl.value = '';
    modeControl.value = product?.es_perecible ? 'fecha' : 'ninguno';
   }
+  lineNode.querySelector('[data-line-total]').textContent='Total: '+new Intl.NumberFormat('es-PE',{style:'currency',currency:'PEN'}).format(entryCostTotal(quantityControl.value,costControl.value));
   unitControl.readOnly = true;
   unitControl.value = product?.unidad_medida || 'unidad';
   modeControl.disabled = Boolean(product?.es_perecible) || product?.controla_inventario === false;
@@ -123,20 +130,22 @@ export async function receptionsPage(root, access) {
      const productId = values['producto_'+index]; if (!productId) continue;
      const product = products.find(row=>String(row.id)===String(productId));
      const received = Number(values['recibida_'+index]);
+     const cost=Number(values['costo_'+index]);
+     if(!Number.isFinite(cost)||cost<=0)throw new Error('Indica el costo unitario de '+product?.nombre+'.');
      if (!product || !Number.isFinite(received) || received<=0) throw new Error('Revisa el producto y la cantidad recibida.');
      const hasExpiration = product.es_perecible || values['caducidad_'+index] === 'fecha';
      const expiration = hasExpiration ? values['vencimiento_'+index] || null : null;
      if (product.controla_inventario !== false && hasExpiration && !expiration) throw new Error('Indica el vencimiento de '+product.nombre+'.');
-     detalles.push({producto_id:productId,lote_id:null,codigo_lote:null,vencimiento:expiration,cantidad_facturada:received,cantidad_recibida:received,unidad:product.unidad_medida,precio_unitario:null});
+     detalles.push({producto_id:productId,lote_id:null,codigo_lote:null,vencimiento:expiration,cantidad_facturada:received,cantidad_recibida:received,unidad:product.unidad_medida,precio_unitario:cost});
     }
     if (!detalles.length) throw new Error('Agrega al menos un producto recibido.');
     const internalNumber = operationId.replaceAll('-','').slice(0,24).toUpperCase();
-    await rpc('app_registrar_recepcion_simple',{p_recepcion:{
+    await rpc('app_registrar_recepcion_con_costo',{p_recepcion:{
      operacion_id:operationId, proveedor_id:values.proveedor_id, tipo_comprobante:'Ingreso de inventario',
      serie:'INT', numero:internalNumber, fecha_emision:values.fecha_recepcion, fecha_recepcion:values.fecha_recepcion,
      sede_id:String(mainSite.id), responsable:values.responsable.trim(), observaciones:values.observaciones?.trim() || '', detalles
     }});
-    notice('Ingreso guardado. El inventario y los lotes se actualizaron automáticamente.'); await refresh();
+    notice('Ingreso guardado. Inventario y gasto por producto actualizados.'); await refresh();
    }
   });
  }
