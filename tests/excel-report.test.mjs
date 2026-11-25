@@ -27,7 +27,8 @@ test('Excel mantiene documentos y fórmulas como texto, cantidades numéricas y 
  const serial=Number(sheet.match(/<c r="A7"[^>]*><v>([^<]+)/)[1]);
  assert.equal(new Date(Math.round((serial-25569)*86400000)).toISOString(),'2026-10-20T23:00:00.000Z');
  assert.match(sheet,/autoFilter ref="A6:D7"/);
- assert.match(sheet,/topLeftCell="A7"/);
+ // Los reportes se desplazan completos; se retiraron las filas congeladas.
+ assert.doesNotMatch(sheet,/<pane\b[^>]*state="frozen/);
  assert.match(sheet,/mergeCell ref="A1:D1"/);
  assert.match(packageFiles['xl/styles.xml'],/FF0F2338/);
 });

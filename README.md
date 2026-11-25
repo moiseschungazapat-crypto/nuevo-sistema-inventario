@@ -12,6 +12,8 @@ No se aplican migraciones automáticamente al desplegar en Vercel. Nunca incluir
 
 Para habilitar el botón del Dashboard que actualiza el reporte diario de Google Sheets, sigue [Activar Google Sheets](database/activar-google-sheets.md). Requiere una cuenta de servicio de Google, una función de lectura y desplegar la función `exportar-google-sheets` en Supabase.
 
+La [corrección de entradas](database/corregir-entradas.md) permite al administrador ajustar cantidades y costos desde Recepciones o Gastos, conservando el historial y actualizando existencias y gastos en una sola operación.
+
 ## Secciones
 
 Dashboard, productos, categorías, proveedores, sedes, inventario por lote/sede, movimientos transaccionales, reportes CSV y administración de perfiles. Roles: administrador, operador y consulta. Ver alcance y límites en la guía de módulos.

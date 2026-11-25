@@ -14,8 +14,8 @@ export async function updateGoogleSheets() {
  return data;
 }
 
-export async function syncInventorySheets() {
- const {data,error}=await supabase.functions.invoke('sincronizar-inventario-sheets',{body:{}});
+export async function syncInventorySheets({refreshOnly=false}={}) {
+ const {data,error}=await supabase.functions.invoke('sincronizar-inventario-sheets',{body:refreshOnly?{refreshOnly:true}:{}});
  if(error){let detail;try{detail=await error.context?.json();}catch{/* La puerta de enlace puede no devolver JSON. */}throw new Error(detail?.error||'No se pudo sincronizar el inventario con Google Sheets.');}
  if(data?.error)throw new Error(data.error);
  if(typeof data?.processed!=='number'||typeof data?.synchronized!=='number'||typeof data?.errors!=='number')throw new Error('El servidor no confirmó el resultado de la sincronización.');

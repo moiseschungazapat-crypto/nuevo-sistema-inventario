@@ -3,6 +3,7 @@ import { heading, e, table, field, options, openEditor, notice, loadError } from
 import { operationalSite, operationalSiteError, operationalSiteLabel } from '../utils/single-site.js';
 import { confirmAction } from '../components/confirmation.js';
 import {entryCostTotal} from '../utils/entry-cost.js';
+import {chooseEntryCorrection} from '../components/entry-corrections.js';
 
 const productLabel = product => `${product.codigo || 'Sin código'} · ${product.nombre}`;
 const limaToday = () => new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -19,13 +20,14 @@ export async function receptionsPage(root, access) {
 
  function render() {
   root.querySelector('#results').innerHTML = table(
-   ['Fecha de recepción','Registrado (Lima)','Proveedor','Sede de recepción','Productos recibidos','Responsable'],
+   ['Fecha de recepción','Registrado (Lima)','Proveedor','Sede de recepción','Productos recibidos','Responsable',...(access.rol==='administrador'?['Correcciones']:[])],
    rows.map(row => [
     e(row.fecha_recepcion || row.fecha_emision), e(limaDateTime(row.created_at)), e(row.proveedor),
-    e(row.sede), e(row.productos), e(row.responsable || '—')
+    e(row.sede), e(row.productos), e(row.responsable || '—'),...(access.rol==='administrador'?[`<button type="button" class="button small" data-reception-correct="${e(row.id)}">Corregir entrada</button>`]:[])
    ]),
    'Todavía no hay ingresos de proveedores registrados.'
   );
+  root.querySelectorAll('[data-reception-correct]').forEach(button=>button.onclick=()=>chooseEntryCorrection({receptionId:button.dataset.receptionCorrect,onSaved:refresh}));
  }
 
  async function refresh() {

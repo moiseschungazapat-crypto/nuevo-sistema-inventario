@@ -2,6 +2,7 @@ import {rpc} from '../services/data.js';
 import {heading,e,field,openEditor,table,pager,notice,loadError} from '../components/ui.js';
 import {downloadExcelReport} from '../utils/excel-report.js';
 import {expenseReportRows} from '../utils/expense-report.js';
+import {chooseEntryCorrection,openEntryCorrection} from '../components/entry-corrections.js';
 
 const categories=['Mercadería','Servicios','Transporte','Mantenimiento','Personal','Alquiler','Otros'];
 const money=value=>new Intl.NumberFormat('es-PE',{style:'currency',currency:'PEN',maximumFractionDigits:4}).format(Number(value));
@@ -14,7 +15,7 @@ export async function expensesPage(root,access){
   return {refresh:async()=>{},tables:[]};
  }
  let data=null,page=0,sequence=0;
- root.innerHTML=heading('Control de gastos','Cuánto se gastó en los productos recibidos y otros gastos del mes.','<button type="button" class="button" id="export-expenses">Descargar reporte Excel</button><button type="button" class="button primary" id="new-expense">+ Otro gasto</button>')+
+ root.innerHTML=heading('Control de gastos','Cuánto se gastó en los productos recibidos y otros gastos del mes.','<button type="button" class="button" id="correct-entry">Corregir entrada</button><button type="button" class="button" id="export-expenses">Descargar reporte Excel</button><button type="button" class="button primary" id="new-expense">+ Otro gasto</button>')+
   `<div class="toolbar expense-period"><label>Período<input type="month" id="expense-month" value="${today().slice(0,7)}"></label><span class="expense-private"><i class="fa-solid fa-lock" aria-hidden="true"></i> Solo administrador o jefe</span><button type="button" class="button" id="expense-refresh">Actualizar</button></div>`+
   '<div id="expense-kpis" class="kpi-grid expense-kpis"></div><section class="panel"><h2>Detalle de gastos</h2><p class="muted">Las entradas con costo generan el gasto automáticamente. Las salidas solo descuentan existencias.</p><div class="toolbar"><label class="search-label">Buscar<input type="search" id="expense-search" placeholder="Producto, código, concepto o proveedor…"></label><label>Categoría<select id="expense-category"><option value="">Todas</option>'+categories.map(c=>`<option>${e(c)}</option>`).join('')+'</select></label></div><div id="expense-results"></div><div class="pagination" id="expense-pager"></div></section>';
  const month=()=>root.querySelector('#expense-month').value+'-01';
@@ -33,10 +34,11 @@ export async function expensesPage(root,access){
   const rows=filtered();page=Math.min(page,Math.max(0,Math.ceil(rows.length/20)-1));
   root.querySelector('#expense-results').innerHTML=table(['Fecha','Producto / concepto','Proveedor','Cantidad','Costo unitario','Total gastado','Origen'],rows.slice(page*20,(page+1)*20).map(row=>[
    e(displayDate(row.fecha)),`<strong>${e(row.producto_nombre||row.concepto)}</strong><small class="expense-detail">${e(row.producto_codigo||row.categoria)}</small>`,e(row.proveedor||'—'),row.cantidad==null?'—':e(row.cantidad+' '+row.unidad),row.costo_unitario==null?'—':e(money(row.costo_unitario)),`<span class="expense-amount">${e(money(row.monto))}</span>`,
-   row.origen==='manual'?`<button type="button" class="button small" data-expense-edit="${e(row.id)}">Editar gasto</button>`:e(row.origen==='recepcion'?'Ingreso de productos':'Entrada manual'),
+   row.origen==='manual'?`<button type="button" class="button small" data-expense-edit="${e(row.id)}">Editar gasto</button>`:`${e(row.origen==='recepcion'?'Ingreso de productos':'Entrada manual')}<br><button type="button" class="button small" data-entry-correct="${e(row.id)}">Corregir entrada</button>`,
   ]),'No hay gastos registrados para este período y filtros.');
   pager(root.querySelector('#expense-pager'),rows.length,page,20,value=>{page=value;render();});
   root.querySelectorAll('[data-expense-edit]').forEach(button=>button.onclick=()=>edit(data.gastos.find(row=>row.id===button.dataset.expenseEdit)));
+  root.querySelectorAll('[data-entry-correct]').forEach(button=>button.onclick=()=>openEntryCorrection({gastoId:button.dataset.entryCorrect,onSaved:refresh}));
  }
  async function refresh(){
   const selected=month(),current=++sequence;
@@ -56,6 +58,7 @@ export async function expensesPage(root,access){
    save:async values=>{await rpc('app_guardar_gasto',{p_operacion:operation,p_datos:values,p_id:row.id||null,p_version:row.version||null});notice('Gasto guardado.');await refresh();}});
  }
  root.querySelector('#new-expense').onclick=()=>edit();
+ root.querySelector('#correct-entry').onclick=()=>chooseEntryCorrection({onSaved:refresh});
  root.querySelector('#export-expenses').onclick=async event=>{
   const button=event.currentTarget;button.disabled=true;
   try{

@@ -42,7 +42,8 @@ class Query{
  }
 }
 export const supabase={
- functions:{async invoke(name){
+ functions:{async invoke(name,args){
+  if(name==='sincronizar-inventario-sheets'){localStorage.setItem('test-inventory-sync-body',JSON.stringify(args.body));return {data:{processed:0,synchronized:0,errors:0},error:null};}
   if(name!=='exportar-google-sheets')throw new Error('Función de prueba desconocida.');
   localStorage.setItem('test-sheets-calls',String(Number(localStorage.getItem('test-sheets-calls')||0)+1));
   if(localStorage.getItem('test-sheets-error'))return {data:null,error:{context:Response.json({error:'Falta conectar la cuenta de Google.'},{status:503})}};
@@ -62,18 +63,30 @@ export const supabase={
  async rpc(name,args={}){
   const data=db();
   if(name==='app_mi_acceso')return {data:data.auth_perfiles[0],error:null};
+  if(['app_entradas_corregibles','app_datos_correccion_entrada','app_corregir_entrada'].includes(name)){
+   if(data.auth_perfiles[0].rol!=='administrador')return {error:{code:'42501'}};
+   if(name==='app_entradas_corregibles')return {data:data.gastos.filter(g=>g.origen!=='manual'&&(!args.p_recepcion||data.recepcion_detalles.some(d=>d.id===g.origen_id&&d.recepcion_id===args.p_recepcion))),error:null};
+   const g=data.gastos.find(g=>g.id===args.p_gasto),d=data.recepcion_detalles.find(d=>d.id===g.origen_id),r=data.recepciones.find(r=>r.id===d.recepcion_id),balance=data.inventario.find(i=>i.lote_id===d.lote_id);
+   if(name==='app_datos_correccion_entrada')return {data:{gasto:g,cantidad:g.anulado?0:g.cantidad,total:g.anulado?0:g.monto,disponible:balance.cantidad,origen:{lote_id:d.lote_id,sede:r.sede,lote:data.lotes.find(l=>l.id===d.lote_id).codigo},historial:g.correcciones||[]},error:null};
+   if(g.version!==args.p_version)return {error:{code:'P0001',message:'Otra persona actualizó esta entrada.'}};
+   const delta=args.p_cantidad-(g.anulado?0:g.cantidad);
+   if(balance.cantidad+delta<0)return {error:{code:'P0001',message:'Stock insuficiente.'}};
+   (g.correcciones||=[]).push({fecha:new Date().toISOString(),responsable:'Ana Administradora',motivo:args.p_motivo,anterior:{cantidad:g.cantidad,total:g.monto},nuevo:{cantidad:args.p_cantidad,total:args.p_cantidad*args.p_costo_unitario}});
+   balance.cantidad+=delta;Object.assign(g,{cantidad:args.p_cantidad,costo_unitario:args.p_costo_unitario,monto:Math.round(args.p_cantidad*args.p_costo_unitario*100)/100,anulado:args.p_cantidad===0,version:g.version+1});save(data);
+   return {data:{id:args.p_operacion,repetido:false},error:null};
+  }
   if(name==='app_resumen_gastos_inicio'){
    localStorage.setItem('test-finance-summary-calls',String(Number(localStorage.getItem('test-finance-summary-calls')||0)+1));
    if(data.auth_perfiles[0].rol!=='administrador')return {error:{code:'42501'}};
    const periodo=new Intl.DateTimeFormat('sv-SE',{timeZone:'America/Lima',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()).slice(0,7)+'-01';
-   const gastos=(data.gastos||[]).filter(row=>row.fecha.slice(0,7)===periodo.slice(0,7));
+   const gastos=(data.gastos||[]).filter(row=>!row.anulado&&row.fecha.slice(0,7)===periodo.slice(0,7));
    return {data:{periodo,total:gastos.reduce((sum,row)=>sum+Number(row.monto),0),cantidad:gastos.length},error:null};
   }
   if(['app_gastos_mes','app_guardar_gasto','app_pagar_gasto','app_presupuesto_gastos'].includes(name)){
    if(data.auth_perfiles[0].rol!=='administrador')return {error:{code:'42501'}};
    data.gastos||=[];data.gastos_presupuestos||={};
    if(name==='app_gastos_mes'){
-    const gastos=data.gastos.filter(row=>row.fecha.slice(0,7)===args.p_mes.slice(0,7));
+    const gastos=data.gastos.filter(row=>!row.anulado&&row.fecha.slice(0,7)===args.p_mes.slice(0,7));
     return {data:{gastos,cantidad:gastos.length,total:gastos.reduce((sum,row)=>sum+Number(row.monto),0),total_productos:gastos.filter(row=>row.origen!=='manual').reduce((sum,row)=>sum+Number(row.monto),0),total_otros:gastos.filter(row=>row.origen==='manual').reduce((sum,row)=>sum+Number(row.monto),0),productos:new Set(gastos.map(row=>row.producto_codigo).filter(Boolean)).size},error:null};
    }
    if(name==='app_guardar_gasto'){
@@ -98,8 +111,9 @@ export const supabase={
      const balance=data.inventario.find(i=>i.producto_id===d.producto_id&&i.lote_id===lotId&&i.sede_id===r.sede_id);
      if(balance)balance.cantidad+=d.cantidad_recibida;else data.inventario.push({id:crypto.randomUUID(),producto_id:d.producto_id,lote_id:lotId,sede_id:r.sede_id,cantidad:d.cantidad_recibida});
     }
-    (data.recepcion_detalles||=[]).push({...d,recepcion_id:id,lote_id:lotId});
-    if(d.precio_unitario>0)(data.gastos||=[]).push({id:crypto.randomUUID(),fecha:r.fecha_recepcion,concepto:'Ingreso: '+product.nombre,categoria:'Mercadería',monto:Math.round(d.cantidad_recibida*d.precio_unitario*100)/100,origen:'recepcion',producto_codigo:product.codigo,producto_nombre:product.nombre,cantidad:d.cantidad_recibida,unidad:product.unidad_medida,costo_unitario:d.precio_unitario,proveedor:'Proveedor',version:1});
+    const detailId=crypto.randomUUID();
+    (data.recepcion_detalles||=[]).push({...d,id:detailId,recepcion_id:id,lote_id:lotId});
+    if(d.precio_unitario>0)(data.gastos||=[]).push({id:crypto.randomUUID(),fecha:r.fecha_recepcion,concepto:'Ingreso: '+product.nombre,categoria:'Mercadería',monto:Math.round(d.cantidad_recibida*d.precio_unitario*100)/100,origen:'recepcion',origen_id:detailId,producto_codigo:product.codigo,producto_nombre:product.nombre,cantidad:d.cantidad_recibida,unidad:product.unidad_medida,costo_unitario:d.precio_unitario,proveedor:'Proveedor',version:1});
    }
    (data.recepciones||=[]).push({...r,id,created_at:new Date().toISOString(),proveedor:'Proveedor',sede:'La Liguria S.A.',productos:r.detalles.map(d=>data.productos.find(p=>p.id===d.producto_id)?.nombre).join(', '),facturado:r.detalles.reduce((s,d)=>s+d.cantidad_facturada,0),recibido:r.detalles.reduce((s,d)=>s+d.cantidad_recibida,0),faltante:0,archivos:0});
    (data.receiptOperations||={})[r.operacion_id]=id;save(data);

@@ -6,8 +6,9 @@ const operationNames={INSERT:'Creación',UPDATE:'Actualización',DELETE:'Elimina
 const fieldNames={nombre:'Nombre',codigo:'Código',descripcion:'Descripción',unidad_medida:'Unidad',rol:'Rol',activo:'Estado',estado:'Estado',vencimiento:'Vencimiento',minimo:'Stock mínimo',direccion:'Dirección',contacto:'Contacto',email:'Correo',telefono:'Teléfono',documento_origen:'Documento',fecha_recepcion:'Recepción',costo_unitario:'Costo unitario',precio:'Precio',es_perecible:'Perecible'};
 const fieldOrder=Object.keys(fieldNames);
 const hiddenFields=new Set(['id','created_at','updated_at','version','user_id','actor_id']);
-Object.assign(tableNames,{gastos:'Gastos',gastos_presupuestos:'Presupuestos de gastos'});
+Object.assign(tableNames,{gastos:'Gastos',gastos_presupuestos:'Presupuestos de gastos',entrada_correcciones:'Corrección de entradas'});
 Object.assign(fieldNames,{concepto:'Concepto',categoria:'Categoría',monto:'Monto (S/)',fecha:'Fecha',fecha_pago:'Fecha de pago',proveedor:'Proveedor',observaciones:'Observación',periodo:'Período'});
+Object.assign(fieldNames,{producto:'Producto',cantidad:'Cantidad',total:'Total (S/)',motivo:'Motivo'});
 hiddenFields.add('solicitud_inicial');hiddenFields.add('created_by');hiddenFields.add('updated_by');
 
 function parseSummary(value){
