@@ -10,7 +10,7 @@ test('corregir entradas ajusta stock y gasto atómicamente y conserva el histori
    create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
    grant usage on schema auth to authenticated,anon;
    create table public.categorias(id bigserial primary key,nombre text);create table public.proveedores(id bigserial primary key,nombre text);create table public.sedes(id bigserial primary key,nombre text);create table public.productos(id bigserial primary key,nombre text,codigo text);create table public.inventario(id bigserial primary key,producto_id bigint,sede_id bigint,cantidad integer default 0,unique(producto_id,sede_id));create table public.movimientos(id bigserial primary key);`);
-  for(const name of ['202609150001_auth_access.sql','202609150002_inventory_modules.sql','202609150004_recepciones.sql','202609150006_catalogo_recepciones.sql','202610200014_recepcion_lotes_automaticos.sql','202611130018_google_sheets_operativo.sql','202611240002_gastos_administracion.sql','202611240003_costos_entradas_gastos.sql','202611240004_resumen_gastos_inicio.sql','202611240005_correcciones_entradas.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+  for(const name of ['202609150001_auth_access.sql','202609150002_inventory_modules.sql','202609150004_recepciones.sql','202609150006_catalogo_recepciones.sql','202610200014_recepcion_lotes_automaticos.sql','202611130018_google_sheets_operativo.sql','202611240002_gastos_administracion.sql','202611240003_costos_entradas_gastos.sql','202611240004_resumen_gastos_inicio.sql','202611240005_correcciones_entradas.sql','202611240006_auditoria_clara.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
   await db.exec(`insert into auth.users values('${admin}','admin@test.local'),('${operator}','operator@test.local');insert into public.auth_perfiles(user_id,nombre,activo,rol)values('${admin}','Admin',true,'administrador'),('${operator}','Operador',true,'operador');insert into public.productos(id,nombre,codigo,unidad_medida,es_perecible)values(1,'Arroz','P1','kg',false);insert into public.proveedores(id,nombre)values(1,'Proveedor');insert into public.sedes(id,nombre)values(1,'Central');select set_config('request.jwt.claim.sub','${admin}',false);set role authenticated;`);
   const date=(await db.query("select (now() at time zone 'America/Lima')::date::text as d")).rows[0].d;
   const input={operacion_id:crypto.randomUUID(),proveedor_id:'1',sede_id:'1',tipo_comprobante:'Ingreso de inventario',serie:'INT',numero:'CORRECCION',fecha_emision:date,fecha_recepcion:date,responsable:'Admin',detalles:[{producto_id:'1',cantidad_recibida:10,precio_unitario:2.5}]};
@@ -31,6 +31,10 @@ test('corregir entradas ajusta stock y gasto atómicamente y conserva el histori
   current=await info();assert.equal(current.historial.length,1);assert.equal(current.historial[0].responsable,'Admin');assert.equal(current.historial[0].anterior.total,25);
   const audit=(await db.query('select public.app_listar_auditoria() as data')).rows[0].data.find(row=>row.tabla==='entrada_correcciones');
   assert.equal(JSON.parse(audit.resumen).producto,'Arroz');assert.match(JSON.parse(audit.resumen).cantidad,/10(?:\.0+)? → 8/);
+  assert.equal(audit.nuevo.anterior.cantidad,10);assert.equal(audit.nuevo.nuevo.cantidad,8);assert.equal(audit.contexto.producto,'Arroz');assert.equal(audit.contexto.unidad,'kg');
+  const events=(await db.query('select public.app_listar_auditoria() as data')).rows[0].data;
+  const purchase=events.find(row=>row.tabla==='gastos'&&row.operacion==='INSERT');assert.equal(purchase.nuevo.producto_nombre,'Arroz');assert.equal(purchase.nuevo.monto,25);assert.equal(purchase.nuevo.solicitud_inicial,undefined);assert.equal(JSON.parse(purchase.resumen).producto_nombre,'Arroz');
+  assert.ok(events.some(row=>row.tabla==='lotes'&&row.contexto.producto==='Arroz'));
   // El documento original sigue igual y un reintento no repone cantidades.
   await save();assert.equal(await stock(),8);
   assert.equal(Number((await db.query('select cantidad_recibida from public.recepcion_detalles')).rows[0].cantidad_recibida),10);
@@ -75,6 +79,7 @@ test('corregir entradas ajusta stock y gasto atómicamente y conserva el histori
   await assert.rejects(correct(-1,5,(await info(manualId)).gasto.version,manualId),/cantidad/i);
   await db.exec(`reset role;select set_config('request.jwt.claim.sub','${operator}',false);set role authenticated;`);
   await assert.rejects(info(),/administrador/);await assert.rejects(list(),/administrador/);await assert.rejects(correct(1,1,1),/administrador/);
+  await assert.rejects(db.query('select public.app_listar_auditoria()'),/administrador/);
   assert.equal((await db.query('select * from public.entrada_correcciones')).rows.length,0);
   await assert.rejects(db.query('update public.gastos set cantidad=1'),/permission denied/);
   await db.exec('reset role;set role anon;');await assert.rejects(info(),/permission denied/);

@@ -67,7 +67,9 @@ test('Navegación, formularios, sincronización y reintentos en navegador',async
   await t.test('auditoría presenta los cambios con lenguaje claro y sin identificadores internos',async()=>{
    await page.goto(base+'/auditoria.html');await page.locator('.audit-summary').first().waitFor();
    const text=await page.locator('#audit-results').innerText();
-   assert.match(text,/Lotes/);assert.match(text,/Creación/);assert.match(text,/Código:\s*REC-20261020-01/);assert.match(text,/Vencimiento:\s*24\/10\/2026/);
+   assert.match(text,/Lotes/);assert.match(text,/Creación/);assert.match(text,/Lote registrado/);assert.match(text,/Harina de trigo/);assert.match(text,/Vencimiento\s*24\/10\/2026/);
+   assert.equal(await page.getByText('REC-20261020-01',{exact:true}).isVisible(),false);
+   await page.locator('.audit-more summary').first().click();assert.equal(await page.getByText('REC-20261020-01',{exact:true}).isVisible(),true);
    assert.doesNotMatch(text,/technical-id|producto_id|created_at|\{"id"/);
   });
   await t.test('cambios en otra pestaña se actualizan sin perder el formulario abierto',async()=>{

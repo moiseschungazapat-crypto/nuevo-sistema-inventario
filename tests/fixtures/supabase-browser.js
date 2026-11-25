@@ -11,7 +11,7 @@ const initial={
  inventario:[{id:'i1',producto_id:'p1',sede_id:'s1',lote_id:'l1',cantidad:25}],
  inventario_minimos:[{id:'mi1',producto_id:'p1',sede_id:'s1',minimo:10}],
  movimientos:[], operations:{},recepciones:[],recepcion_detalles:[],receiptOperations:{},gastos:[],gastos_presupuestos:{},
- auditoria:[{fecha:'2026-10-20T19:40:48Z',tabla:'lotes',operacion:'INSERT',actor_nombre:'Ana Administradora',actor_email:'admin@example.test',resumen:JSON.stringify({id:'technical-id',codigo:'REC-20261020-01',producto_id:'p1',vencimiento:'2026-10-24',documento_origen:'Factura HDA000123-1234',created_at:'2026-10-20T19:40:48Z'})}]
+ auditoria:[{fecha:'2026-10-20T19:40:48Z',tabla:'lotes',operacion:'INSERT',actor_nombre:'Ana Administradora',actor_email:'admin@example.test',contexto:{producto:'Harina de trigo',codigo:'HAR-001',unidad:'kg'},resumen:JSON.stringify({id:'technical-id',codigo:'REC-20261020-01',producto_id:'p1',vencimiento:'2026-10-24',documento_origen:'Factura HDA000123-1234',created_at:'2026-10-20T19:40:48Z'})}]
 };
 function db(){return JSON.parse(localStorage.getItem(key)||JSON.stringify(initial));}
 function save(value){localStorage.setItem(key,JSON.stringify(value));new BroadcastChannel('test-realtime').postMessage('change');}
